@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS sites (
   logo TEXT,
   category_id INTEGER,
   sort_order INTEGER DEFAULT 0,
+  click_count INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL

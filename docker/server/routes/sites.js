@@ -42,7 +42,7 @@ router.get('/', (req, res) => {
         FROM sites s
         LEFT JOIN categories c ON s.category_id = c.id
         ${whereClause}
-        ORDER BY s.sort_order ASC, s.created_at DESC
+        ORDER BY s.click_count DESC, s.sort_order ASC, s.created_at DESC
         LIMIT ? OFFSET ?
     `);
     const results = dataStmt.all(...params, pageSizeNum, offset);
@@ -168,6 +168,20 @@ router.delete('/:id', requireAuth, (req, res) => {
         return res.status(404).json({ success: false, message: '站点不存在' });
     }
     res.json({ success: true, message: '站点删除成功' });
+});
+
+// 记录站点点击（无需认证）
+router.post('/:id/click', (req, res) => {
+    const siteId = parseInt(req.params.id);
+    if (isNaN(siteId)) {
+        return res.status(400).json({ success: false, message: '无效的站点ID' });
+    }
+
+    const result = db.prepare('UPDATE sites SET click_count = click_count + 1 WHERE id = ?').run(siteId);
+    if (result.changes === 0) {
+        return res.status(404).json({ success: false, message: '站点不存在' });
+    }
+    res.json({ success: true });
 });
 
 // 站点排序（需要认证）

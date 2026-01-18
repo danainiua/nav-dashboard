@@ -91,4 +91,15 @@ export async function fetchSitesByTags(tagIds, page = 1) {
     return await response.json();
 }
 
+/**
+ * 记录站点点击
+ */
+export async function recordSiteClick(siteId) {
+    try {
+        await fetch(`${API_BASE}/api/sites/${siteId}/click`, { method: 'POST' });
+    } catch (e) {
+        // 静默失败，不影响用户体验
+    }
+}
+
 export { API_BASE };

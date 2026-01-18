@@ -295,6 +295,11 @@ async function handleAPI(request, env, pathname, corsHeaders) {
         return await restoreRemoteLogos(env, corsHeaders);
     }
 
+    if (pathname.match(/^\/api\/sites\/\d+\/click$/)) {
+        const id = pathname.split('/')[3];
+        if (method === 'POST') return await recordSiteClick(id, env, corsHeaders);
+    }
+
     if (pathname.match(/^\/api\/sites\/\d+$/)) {
         const id = pathname.split('/').pop();
         if (method === 'GET') return await getSite(id, env, corsHeaders);
@@ -553,7 +558,7 @@ async function getSites(request, env, corsHeaders) {
         FROM sites s
         LEFT JOIN categories c ON s.category_id = c.id
         ${whereClause}
-        ORDER BY s.sort_order ASC, s.created_at DESC
+        ORDER BY s.click_count DESC, s.sort_order ASC, s.created_at DESC
         LIMIT ? OFFSET ?
     `;
     const dataParams = [...params, pageSize, offset];
@@ -689,6 +694,23 @@ async function deleteSite(id, env, corsHeaders) {
     }
 
     return jsonResponse({ success: true, message: '站点删除成功' }, 200, corsHeaders);
+}
+
+// 记录站点点击
+async function recordSiteClick(id, env, corsHeaders) {
+    try {
+        const result = await env.DB.prepare(
+            'UPDATE sites SET click_count = click_count + 1 WHERE id = ?'
+        ).bind(id).run();
+
+        if (result.meta.changes === 0) {
+            return jsonResponse({ success: false, message: '站点不存在' }, 404, corsHeaders);
+        }
+
+        return jsonResponse({ success: true }, 200, corsHeaders);
+    } catch (error) {
+        return jsonResponse({ success: false, message: error.message }, 500, corsHeaders);
+    }
 }
 
 // 恢复网络图标（将所有站点图标恢复为 Google Favicon）
