@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Zampto Auto Renew (v3.4 Ref-Core)
+// @name         Zampto Auto Renew (v3.5 Big UI)
 // @namespace    http://tampermonkey.net/
-// @version      3.4
-// @description  还原参考代码的 simulateClick 点击逻辑，支持跨页面状态记忆，防止刷新后重置
+// @version      3.5
+// @description  基于 v3.4 核心：加大面板尺寸，增加日志显示行数，保留原生模拟点击逻辑
 // @author       Gemini
 // @match        https://dash.zampto.net/server?id=2574*
 // @grant        none
@@ -13,22 +13,20 @@
 
     // --- 1. 配置 ---
     const CONFIG = {
-        storageKey: 'zampto_v3_4_ref',
+        storageKey: 'zampto_v3_5_ui',
         btnText: "Renew Server",
         renewInterval: 24 * 60 * 60 * 1000 // 24小时
     };
 
     // --- 2. 状态管理 ---
-    // 读取保存的状态，如果页面刷新了，这里会读到之前存的数据
     let data = JSON.parse(localStorage.getItem(CONFIG.storageKey)) || {
         nextRunTime: 0,
-        status: 'idle', // idle (空闲), checking (点击后等待检测)
+        status: 'idle', 
         logs: [],
         lastExpiryMinutes: 0
     };
 
-    // --- 3. 参考代码同款点击函数 (核心) ---
-    // 这就是你参考代码里点击之所以好用的原因
+    // --- 3. 核心点击函数 (模拟完整鼠标事件) ---
     function simulateClick(element) {
         if (!element) return;
         ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(eventType => {
@@ -60,86 +58,99 @@
         return target ? target.innerText.replace('Expiry (Next Renewal):', '').trim() : "获取中...";
     }
 
-    // --- 5. UI 面板 ---
+    // --- 5. UI 面板 (已调整尺寸) ---
     const panel = document.createElement('div');
-    panel.style = "position:fixed;bottom:10px;right:10px;width:350px;background:#000;color:#ccc;z-index:999999;border:1px solid #333;padding:10px;font-family:monospace;font-size:12px;";
-    panel.innerHTML = `<div style="border-bottom:1px solid #333;margin-bottom:5px;font-weight:bold;color:#a78bfa">⚡ Zampto v3.4 (Ref-Core)</div>
-                       <div id="kb-status" style="margin-bottom:5px;color:#fff">初始化...</div>
-                       <div style="margin-bottom:5px"><button id="kb-reset" style="background:#dc3545;color:white;border:none;padding:3px 8px;cursor:pointer">重置任务</button></div>
-                       <div id="kb-logs" style="height:120px;overflow-y:auto;border:1px solid #333;padding:5px;"></div>`;
+    // 修改点：width 改为 420px
+    panel.style = "position:fixed;bottom:10px;right:10px;width:420px;background:#080808;color:#ccc;z-index:999999;border:1px solid #444;padding:12px;font-family:'Consolas', monospace;font-size:12px;box-shadow: 0 0 15px rgba(0,0,0,0.8);border-radius:5px;";
+    
+    panel.innerHTML = `
+        <div style="border-bottom:1px solid #444;margin-bottom:8px;padding-bottom:5px;display:flex;justify-content:space-between;">
+            <span style="font-weight:bold;color:#a78bfa;font-size:14px;">⚡ Zampto Monitor (v3.5)</span>
+            <button id="kb-hide" style="background:none;border:none;color:#666;cursor:pointer;">[-]</button>
+        </div>
+        <div id="kb-content">
+            <div id="kb-status" style="margin-bottom:8px;color:#fff;font-size:13px;background:#222;padding:5px;border-radius:3px;">初始化...</div>
+            <div style="margin-bottom:8px;display:flex;gap:10px;">
+                <button id="kb-reset" style="background:#dc3545;color:white;border:none;padding:5px 12px;cursor:pointer;border-radius:3px;font-weight:bold;">重置并运行</button>
+                <button id="kb-pause" style="background:#ffc107;color:black;border:none;padding:5px 12px;cursor:pointer;border-radius:3px;font-weight:bold;">暂停</button>
+            </div>
+            <div id="kb-logs" style="height:400px;overflow-y:auto;border:1px solid #333;padding:8px;background:#000;border-radius:3px;"></div>
+        </div>
+    `;
     document.body.appendChild(panel);
 
     function log(msg, color = "#aaa") {
         const time = new Date().toLocaleTimeString();
-        data.logs.unshift(`<div style="color:${color}"><span style="color:#555">[${time}]</span> ${msg}</div>`);
-        if (data.logs.length > 30) data.logs.pop();
+        // 增加日志显示数量上限到 80 条
+        data.logs.unshift(`<div style="color:${color};margin-bottom:3px;border-bottom:1px dashed #222;padding-bottom:2px;"><span style="color:#555">[${time}]</span> ${msg}</div>`);
+        if (data.logs.length > 80) data.logs.pop();
         localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
-        document.getElementById('kb-logs').innerHTML = data.logs.join('');
+        renderLogs();
+    }
+    
+    function renderLogs() {
+         const logDiv = document.getElementById('kb-logs');
+         if(logDiv) logDiv.innerHTML = data.logs.join('');
     }
 
-    function updateStatus(text) { document.getElementById('kb-status').innerHTML = text; }
+    function updateStatus(text) { 
+        const el = document.getElementById('kb-status');
+        if(el) el.innerHTML = text; 
+    }
 
     // --- 6. 核心逻辑 ---
 
-    // 步骤A: 检查结果 (页面加载后或点击后运行)
     function checkResult() {
         const currentMinutes = getCleanExpiryMinutes();
-        // 如果当前时间 > 点击前记录的时间，或者 > 2000分钟(约1.5天)，说明成功了
         if (currentMinutes > data.lastExpiryMinutes || currentMinutes > 2000) {
-            log(`✅ 续期成功! 当前: ${getExpiryDisplay()}`, "#2ecc71");
+            log(`✅ 续期成功! 当前有效期: ${getExpiryDisplay()}`, "#2ecc71");
             data.status = 'idle';
             data.nextRunTime = Date.now() + CONFIG.renewInterval;
             localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
         } else {
-            // 时间没变，说明没成功或者网页还没刷新好
-            log("⚠️ 时间未增加，可能是刚刷新，等待下轮重试...", "#e67e22");
-            // 保持 checking 状态或者重置为 idle 让它重新点，这里我们重置为 idle 让它立刻重试
+            log("⚠️ 时间未更新，等待下轮 (60s后) 重试...", "#e67e22");
             data.status = 'idle'; 
-            data.nextRunTime = Date.now() + 60000; // 1分钟后重试
+            data.nextRunTime = Date.now() + 60000; 
             localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
         }
     }
 
-    // 步骤B: 执行续期
     async function executeRenew() {
-        // 1. 记录当前时间
         const minutes = getCleanExpiryMinutes();
         data.lastExpiryMinutes = minutes; 
-        data.status = 'checking'; // 标记为"正在检查"，这样刷新后脚本知道该去对比时间了
+        data.status = 'checking'; 
         localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
 
         log(`🖱️ 准备点击... (当前: ${getExpiryDisplay()})`, "#3498db");
         
-        // 2. 寻找按钮
         const btn = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent.includes(CONFIG.btnText));
         
         if (btn) {
-            // 3. 使用参考代码的 simulateClick
             simulateClick(btn);
-            log("🚀 已触发 simulateClick", "#9b59b6");
+            log("🚀 已触发点击动作 (SimulateClick)", "#9b59b6");
             
-            // 4. 死等 10秒，如果网页没刷新，我们自己去检查时间
             await new Promise(r => setTimeout(r, 10000));
             log("👀 点击后10秒自检...", "#3498db");
             checkResult();
         } else {
-            log("❌ 找不到按钮", "#e74c3c");
-            data.status = 'idle'; // 找不到就退回空闲
+            log("❌ 未找到 Renew 按钮", "#e74c3c");
+            data.status = 'idle';
         }
     }
 
     // 主循环
+    let isPaused = false;
     setInterval(() => {
+        if (isPaused) { updateStatus("🔴 脚本已暂停"); return; }
+        
         const now = Date.now();
         
-        // 如果是"checking"状态 (说明刚点完，可能网页刷新了刚回来)
         if (data.status === 'checking') {
             updateStatus("🔎 正在验证上一次点击结果...");
-            checkResult(); // 立即检查结果
+            checkResult();
             return;
         }
 
-        // 倒计时逻辑
         if (now < data.nextRunTime) {
             const diff = data.nextRunTime - now;
             const h = Math.floor(diff / 3600000);
@@ -149,20 +160,30 @@
             return;
         }
 
-        // 时间到了，开始干活
         updateStatus("⚙️ 正在执行续期...");
         executeRenew();
 
-    }, 2000); // 2秒轮询一次
+    }, 2000);
 
-    // 启动时
-    document.getElementById('kb-logs').innerHTML = data.logs.join('');
+    // 交互绑定
+    renderLogs();
+    
     document.getElementById('kb-reset').onclick = () => {
         data = { nextRunTime: 0, status: 'idle', logs: [], lastExpiryMinutes: 0 };
         localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
         location.reload();
     };
+    
+    document.getElementById('kb-pause').onclick = function() {
+        isPaused = !isPaused;
+        this.innerText = isPaused ? "恢复" : "暂停";
+    };
+    
+    document.getElementById('kb-hide').onclick = () => {
+        const content = document.getElementById('kb-content');
+        content.style.display = content.style.display === 'none' ? 'block' : 'none';
+    };
 
-    log("🤖 脚本已加载 (Reference Mode)", "#fff");
+    log("🤖 大屏监控模式已就绪 (v3.5)", "#fff");
 
 })();
