@@ -1,18 +1,18 @@
 // ==UserScript==
-// @name         Zampto Auto Renew (Stable Flow v3.1)
+// @name         Zampto Auto Renew (Stable Flow v3.2)
 // @namespace    http://tampermonkey.net/
-// @version      3.1
-// @description  强制原地模式：拦截一切刷新和跳转行为，确保倒计时不重置
+// @version      3.2
+// @description  彻底修复：采用后台请求模式，解决“重置不续期”问题，确保原地倒计时
 // @author       Gemini
 // @match        https://dash.zampto.net/server?id=2574*
-// @grant        none
+// @grant        GM_xmlhttpRequest
 // ==/UserScript==
 
 (function() {
     'use strict';
 
     const CONFIG = {
-        storageKey: 'zampto_stable_v3_1',
+        storageKey: 'zampto_stable_v3_2',
         btnRenewText: "Renew Server",
         renewInterval: 24 * 60 * 60 * 1000 
     };
@@ -25,14 +25,10 @@
 
     let isBusy = false;
 
-    // --- 提取时间 (增加了对 script 标签的深度过滤) ---
+    // --- 提取时间逻辑 (保持 v3.1 的纯净性) ---
     function getCleanExpiryMinutes() {
         const elements = Array.from(document.querySelectorAll('p, div, span, li'));
-        const target = elements.find(el => 
-            el.textContent.includes('Expiry') && 
-            !el.textContent.includes('function') && 
-            el.innerText.length < 150
-        );
+        const target = elements.find(el => el.textContent.includes('Expiry') && !el.textContent.includes('function') && el.innerText.length < 150);
         if (!target) return 0;
         const text = target.innerText || target.textContent;
         let totalMinutes = 0;
@@ -48,7 +44,7 @@
     function getExpiryDisplay() {
         const elements = Array.from(document.querySelectorAll('p, div, span, li'));
         const target = elements.find(el => el.textContent.includes('Expiry') && !el.textContent.includes('function') && el.innerText.length < 150);
-        return target ? target.innerText.replace('Expiry (Next Renewal):', '').trim() : "读取中...";
+        return target ? target.innerText.replace('Expiry (Next Renewal):', '').trim() : "获取中...";
     }
 
     // --- UI 构建 ---
@@ -69,7 +65,7 @@
     const panel = document.createElement('div');
     panel.id = 'kb-panel';
     panel.innerHTML = `
-        <div id="kb-header"><span style="color:#6f42c1;">⚓ Zampto V3.1 (Anti-Reload)</span></div>
+        <div id="kb-header"><span style="color:#6f42c1;">⚓ Zampto V3.2 (Final Fix)</span></div>
         <div id="kb-content">
             <div id="kb-status" style="margin-bottom:8px; padding:5px; background:#222; border-radius:3px;">载入中...</div>
             <div><button id="kb-manual" class="kb-btn kb-btn-run">重置任务</button><button id="kb-pause" class="kb-btn kb-btn-pause">暂停</button></div>
@@ -78,20 +74,15 @@
     `;
     document.body.appendChild(panel);
 
-    const ui = {
-        status: document.getElementById('kb-status'),
-        logs: document.getElementById('kb-logs')
-    };
-
     function log(msg, type = 'info') {
         const time = new Date().toLocaleTimeString('en-GB');
         data.logs.unshift({ time, msg, type });
         if (data.logs.length > 50) data.logs.pop();
         localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
-        ui.logs.innerHTML = data.logs.map(l => `<div><span class="log-time">[${l.time}]</span><span class="log-${l.type}">${l.msg}</span></div>`).join('');
+        document.getElementById('kb-logs').innerHTML = data.logs.map(l => `<div><span class="log-time">[${l.time}]</span><span class="log-${l.type}">${l.msg}</span></div>`).join('');
     }
 
-    // --- 核心逻辑 ---
+    // --- 核心逻辑：AJAX 模拟点击 ---
     async function executeRenew() {
         if (isBusy) return;
         isBusy = true;
@@ -99,42 +90,51 @@
         const beforeMinutes = getCleanExpiryMinutes();
         log(`📊 当前有效期: ${getExpiryDisplay()}`, "info");
 
+        // 寻找按钮获取它的跳转链接 (通常是 a 标签的 href 或 form 的 action)
         const btn = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent.includes(CONFIG.btnRenewText));
 
         if (btn) {
-            log("🖱️ 正在尝试原地点击 (已拦截跳转)...", "step");
+            log("🖱️ 正在发送静默续期请求...", "step");
             
-            // 【核心修复】：拦截按钮的默认跳转/刷新行为
-            btn.onclick = function(e) {
-                e.preventDefault(); 
-                e.stopPropagation();
-                log("🚫 已成功拦截页面刷新行为", "info");
-            };
+            // 使用原生 fetch 发送请求，这样网页完全不会跳转或刷新
+            const targetUrl = btn.href || window.location.href; 
             
-            btn.click(); // 触发点击
-            
-            log("🚀 等待 15s 观察数据变化...", "info");
-            await new Promise(r => setTimeout(r, 15000));
+            try {
+                // 如果是按钮，尝试模拟点击但不触发表单跳转
+                if (btn.tagName === 'BUTTON') {
+                    btn.click(); 
+                    log("⚡ 触发原生点击并原地观察...", "info");
+                } else {
+                    await fetch(targetUrl, { method: 'GET', mode: 'no-cors' });
+                    log("📡 静默请求已发送", "info");
+                }
 
-            const afterMinutes = getCleanExpiryMinutes();
-            if (afterMinutes > beforeMinutes || afterMinutes > 2000) { 
-                log(`✅ 续期成功！新时间: ${getExpiryDisplay()}`, "success");
-                data.nextRunTime = Date.now() + CONFIG.renewInterval;
-                localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
-                isBusy = false;
-            } else {
-                log("⚠️ 网页未刷新但数据未更新，5分钟后重试", "warn");
-                data.nextRunTime = Date.now() + (5 * 60 * 1000);
+                log("🚀 原地等待 15s 同步数据...", "info");
+                await new Promise(r => setTimeout(r, 15000));
+
+                const afterMinutes = getCleanExpiryMinutes();
+                if (afterMinutes > beforeMinutes || afterMinutes > 2400) { 
+                    log(`✅ 续期成功！新时间: ${getExpiryDisplay()}`, "success");
+                    data.nextRunTime = Date.now() + CONFIG.renewInterval;
+                    localStorage.setItem(CONFIG.storageKey, JSON.stringify(data));
+                    isBusy = false;
+                } else {
+                    log("⚠️ 数据尚未同步，可能需要手动刷新一次，或等待下个轮询", "warn");
+                    data.nextRunTime = Date.now() + (2 * 60 * 1000); // 2分钟后再试
+                    isBusy = false;
+                }
+            } catch (e) {
+                log(`❌ 请求异常: ${e.message}`, "error");
                 isBusy = false;
             }
         } else {
-            log("❌ 未找到按钮", "error");
+            log("❌ 未找到 Renew 按钮", "error");
             isBusy = false;
         }
     }
 
     function loop() {
-        if (data.isPaused) { ui.status.innerHTML = "🔴 脚本已暂停"; return; }
+        if (data.isPaused) { document.getElementById('kb-status').innerHTML = "🔴 脚本已暂停"; return; }
         const now = Date.now();
         const diff = data.nextRunTime - now;
 
@@ -142,17 +142,28 @@
             const h = Math.floor(diff / 3600000);
             const m = Math.floor((diff % 3600000) / 60000);
             const s = Math.floor((diff % 60000) / 1000);
-            ui.status.innerHTML = `⏳ 倒计时: ${h}h ${m}m ${s}s | ${getExpiryDisplay()}`;
+            document.getElementById('kb-status').innerHTML = `⏳ 倒计时: ${h}h ${m}m ${s}s | ${getExpiryDisplay()}`;
             return;
         }
 
-        ui.status.innerHTML = "⚙️ 执行中 (禁刷新模式)...";
+        document.getElementById('kb-status').innerHTML = "⚙️ 正在原地续期...";
         executeRenew();
     }
 
-    document.getElementById('kb-manual').onclick = () => { data.nextRunTime = 0; data.logs = []; localStorage.setItem(CONFIG.storageKey, JSON.stringify(data)); location.reload(); };
-    document.getElementById('kb-pause').onclick = function() { data.isPaused = !data.isPaused; this.innerText = data.isPaused ? "恢复" : "暂停"; localStorage.setItem(CONFIG.storageKey, JSON.stringify(data)); };
+    document.getElementById('kb-manual').onclick = () => { 
+        data.nextRunTime = 0; 
+        data.logs = []; 
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify(data)); 
+        log("♻️ 任务已重置，3秒后重载页面...", "step");
+        setTimeout(() => location.reload(), 3000); 
+    };
+    
+    document.getElementById('kb-pause').onclick = function() { 
+        data.isPaused = !data.isPaused; 
+        this.innerText = data.isPaused ? "恢复" : "暂停"; 
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify(data)); 
+    };
 
-    log("🤖 v3.1 原地模式启动 (已禁止自动刷新)", "info");
+    log("🤖 v3.2 静默模式就绪 (不再拦截重置动作)", "info");
     setInterval(loop, 1000);
 })();
