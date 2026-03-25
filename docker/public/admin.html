@@ -700,6 +700,18 @@
             window.location.href = '/';
         }
 
+        async function ensureServerAuth() {
+            try {
+                const response = await fetch('/api/auth/status', {
+                    credentials: 'same-origin'
+                });
+                const data = await response.json();
+                return Boolean(response.ok && data.success && data.authenticated);
+            } catch (error) {
+                return false;
+            }
+        }
+
         function enablePasswordForm() {
             // 不再需要，改为动态生成
         }
@@ -776,22 +788,36 @@
             }
         }
 
-        // 检查是否从主页验证过来，或者已经在admin页面登录过
-        if (sessionStorage.getItem('editModeUnlocked') === 'true' ||
-            (sessionStorage.getItem('adminLoggedIn') === 'true' && !isSessionExpired())) {
+        async function initAdminAuth() {
+            const hasLocalSession = sessionStorage.getItem('editModeUnlocked') === 'true' ||
+                (sessionStorage.getItem('adminLoggedIn') === 'true' && !isSessionExpired());
+
+            if (!hasLocalSession) {
+                sessionStorage.removeItem('adminLoggedIn');
+                sessionStorage.removeItem('adminLoginTime');
+                window.location.href = '/';
+                return;
+            }
+
+            const isServerAuthenticated = await ensureServerAuth();
+            if (!isServerAuthenticated) {
+                sessionStorage.removeItem('adminLoggedIn');
+                sessionStorage.removeItem('adminLoginTime');
+                sessionStorage.removeItem('editModeUnlocked');
+                alert('登录状态已失效，请重新验证后再进入管理后台');
+                window.location.href = '/';
+                return;
+            }
+
             document.getElementById('loginOverlay').style.display = 'none';
             document.getElementById('adminContent').style.display = 'block';
-            // 同步登录状态
             sessionStorage.setItem('adminLoggedIn', 'true');
             if (!sessionStorage.getItem('adminLoginTime')) {
                 sessionStorage.setItem('adminLoginTime', Date.now().toString());
             }
-        } else {
-            sessionStorage.removeItem('adminLoggedIn');
-            sessionStorage.removeItem('adminLoginTime');
-            // 未验证，跳转回主页
-            window.location.href = '/';
         }
+
+        initAdminAuth();
 
         setInterval(() => {
             if (sessionStorage.getItem('adminLoggedIn') === 'true' && isSessionExpired()) {

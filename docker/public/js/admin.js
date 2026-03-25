@@ -216,6 +216,7 @@ async function saveSortOrder(newOrder) {
     try {
         const response = await fetch('/api/sites/reorder', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ order: newOrder })
         });
@@ -353,7 +354,10 @@ async function deleteSite(id) {
     if (!confirm('确定要删除这个站点吗？')) return;
 
     try {
-        const response = await fetch(`/api/sites/${id}`, { method: 'DELETE' });
+        const response = await fetch(`/api/sites/${id}`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        });
         const result = await response.json();
 
         if (result.success) {
@@ -443,6 +447,7 @@ async function checkSelectedSites() {
     try {
         const response = await fetch('/api/sites/check-availability', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ siteIds: ids })
         });
@@ -484,6 +489,7 @@ async function deleteSelectedFailedSites() {
     try {
         const response = await fetch('/api/sites/bulk-delete', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ siteIds: ids })
         });
@@ -514,6 +520,7 @@ async function checkSite(id) {
     try {
         const response = await fetch('/api/sites/check-availability', {
             method: 'POST',
+            credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ siteIds: [id] })
         });
