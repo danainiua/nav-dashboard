@@ -43,6 +43,11 @@ function initDatabase() {
             logo TEXT,
             category_id INTEGER,
             sort_order INTEGER DEFAULT 0,
+            click_count INTEGER DEFAULT 0,
+            last_check_status TEXT DEFAULT 'unchecked',
+            last_check_http_status INTEGER,
+            last_check_error TEXT,
+            last_check_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
@@ -104,6 +109,32 @@ function initDatabase() {
         db.exec(`ALTER TABLE sites ADD COLUMN click_count INTEGER DEFAULT 0`);
         console.log('✅ 已添加 click_count 字段');
     }
+
+    const hasLastCheckStatus = columns.some(col => col.name === 'last_check_status');
+    if (!hasLastCheckStatus) {
+        db.exec(`ALTER TABLE sites ADD COLUMN last_check_status TEXT DEFAULT 'unchecked'`);
+        console.log('✅ 已添加 last_check_status 字段');
+    }
+
+    const hasLastCheckHttpStatus = columns.some(col => col.name === 'last_check_http_status');
+    if (!hasLastCheckHttpStatus) {
+        db.exec(`ALTER TABLE sites ADD COLUMN last_check_http_status INTEGER`);
+        console.log('✅ 已添加 last_check_http_status 字段');
+    }
+
+    const hasLastCheckError = columns.some(col => col.name === 'last_check_error');
+    if (!hasLastCheckError) {
+        db.exec(`ALTER TABLE sites ADD COLUMN last_check_error TEXT`);
+        console.log('✅ 已添加 last_check_error 字段');
+    }
+
+    const hasLastCheckAt = columns.some(col => col.name === 'last_check_at');
+    if (!hasLastCheckAt) {
+        db.exec(`ALTER TABLE sites ADD COLUMN last_check_at DATETIME`);
+        console.log('✅ 已添加 last_check_at 字段');
+    }
+
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_sites_last_check_status ON sites(last_check_status)`);
 
     // 插入默认数据（如果表为空）
     const categoryCount = db.prepare('SELECT COUNT(*) as count FROM categories').get();
