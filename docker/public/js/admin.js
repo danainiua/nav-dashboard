@@ -1,5 +1,6 @@
 // API基础路径
 const API_BASE = '';  // 空字符串表示相对路径
+const DEFAULT_ICON = '/default-icon.png';
 
 // 全局状态
 let sites = [];
@@ -73,6 +74,15 @@ async function init() {
         fetchBtn2.title = 'toolb.cn源';
         fetchBtn2.onclick = autoFetchLogo2;
         logoInputGroup.insertBefore(fetchBtn2, uploadBtn);
+
+        const defaultBtn = document.createElement('button');
+        defaultBtn.type = 'button';
+        defaultBtn.className = 'btn-secondary';
+        defaultBtn.style.whiteSpace = 'nowrap';
+        defaultBtn.innerHTML = '🌐 默认';
+        defaultBtn.title = '使用兜底默认图标';
+        defaultBtn.onclick = useDefaultLogo;
+        logoInputGroup.insertBefore(defaultBtn, uploadBtn);
     }
 
     // 加载数据
@@ -874,6 +884,13 @@ function autoFetchLogo2() {
     } catch {
         showNotification('URL格式无效', 'error');
     }
+}
+
+function useDefaultLogo() {
+    const logoInput = document.getElementById('siteLogo');
+    logoInput.value = DEFAULT_ICON;
+    updateLogoPreview(DEFAULT_ICON);
+    showNotification('已使用默认图标', 'success');
 }
 
 // HTML 转义
