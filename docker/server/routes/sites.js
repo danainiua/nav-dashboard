@@ -42,6 +42,15 @@ const deleteSitesWithTags = db.transaction((siteIds) => {
     return deletedSites;
 });
 
+function faviconFromUrl(url) {
+    try {
+        const domain = new URL(url).hostname;
+        return `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
+    } catch (e) {
+        return '';
+    }
+}
+
 async function runWithConcurrency(items, limit, worker) {
     const results = new Array(items.length);
     let currentIndex = 0;
@@ -167,14 +176,8 @@ router.post('/', requireAuth, asyncHandler(async (req, res) => {
     const { name, url, description } = validation.sanitized;
     let siteLogo = validation.sanitized.logo;
 
-    // 自动获取 favicon
     if (!siteLogo) {
-        try {
-            const domain = new URL(url).hostname;
-            siteLogo = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-        } catch (e) {
-            siteLogo = '';
-        }
+        siteLogo = faviconFromUrl(url);
     }
 
     const stmt = db.prepare(`INSERT INTO sites (name, url, description, logo, category_id, sort_order) VALUES (?, ?, ?, ?, ?, ?)`);
@@ -201,12 +204,8 @@ router.put('/:id', requireAuth, asyncHandler(async (req, res) => {
     let siteLogo = validation.sanitized.logo;
 
     if (!siteLogo) {
-        try {
-            const domain = new URL(url).hostname;
-            siteLogo = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-        } catch (e) {
-            siteLogo = '';
-        }
+        const existingSite = db.prepare('SELECT logo FROM sites WHERE id = ?').get(siteId);
+        siteLogo = existingSite?.logo || faviconFromUrl(url);
     }
 
     const stmt = db.prepare(`UPDATE sites SET name=?, url=?, description=?, logo=?, category_id=?, sort_order=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`);

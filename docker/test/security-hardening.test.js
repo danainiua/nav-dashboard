@@ -190,6 +190,53 @@ test('auth cookie attributes and password changes invalidate old tokens', async 
     });
 });
 
+test('site updates preserve existing logo when logo input is empty', async (t) => {
+    await withIsolatedServer(t, {}, async ({ port, db }) => {
+        const login = await request(port, {
+            method: 'POST',
+            routePath: '/api/auth/verify',
+            body: { password: 'security-admin-pass' }
+        });
+        const authHeaders = { Authorization: `Bearer ${login.body.token}` };
+
+        const create = await request(port, {
+            method: 'POST',
+            routePath: '/api/sites',
+            body: {
+                name: 'Original title',
+                url: 'https://example.com',
+                description: '',
+                logo: '/default-icon.png',
+                category_id: null,
+                sort_order: 0
+            },
+            headers: authHeaders
+        });
+        assert.equal(create.statusCode, 200);
+        const siteId = create.body?.data?.id;
+        assert.ok(siteId);
+
+        const update = await request(port, {
+            method: 'PUT',
+            routePath: `/api/sites/${siteId}`,
+            body: {
+                name: 'Updated title',
+                url: 'https://example.com',
+                description: '',
+                logo: '',
+                category_id: null,
+                sort_order: 0
+            },
+            headers: authHeaders
+        });
+        assert.equal(update.statusCode, 200);
+
+        const saved = db.prepare('SELECT name, logo FROM sites WHERE id = ?').get(siteId);
+        assert.equal(saved.name, 'Updated title');
+        assert.equal(saved.logo, '/default-icon.png');
+    });
+});
+
 function withImageServer(handler) {
     return new Promise((resolve) => {
         const server = http.createServer(handler);
