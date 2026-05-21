@@ -23,9 +23,11 @@ function safeHttpUrl(value, fallback = '#') {
     }
 }
 
-function safeImageSrc(value, fallback = '') {
+const DEFAULT_ICON = '/default-icon.png';
+
+function safeImageSrc(value, fallback = DEFAULT_ICON) {
     const src = String(value || '').trim();
-    if (src.startsWith('/api/images/') || src === '/default-icon.png') {
+    if (src.startsWith('/api/images/') || src === DEFAULT_ICON) {
         return src;
     }
     return safeHttpUrl(src, fallback);
@@ -88,7 +90,7 @@ export function setupSearch() {
                         <div class="suggestion-header">📌 站内匹配</div>
                         ${matches.map(site => `
                             <a href="${escapeAttr(safeHttpUrl(site.url))}" target="_blank" rel="noopener noreferrer" class="suggestion-item">
-                                <img src="${escapeAttr(safeImageSrc(site.logo || ''))}" alt="" onerror="this.style.display='none'">
+                                <img src="${escapeAttr(safeImageSrc(site.logo || DEFAULT_ICON))}" alt="" onerror="if (this.src !== '${DEFAULT_ICON}') this.src='${DEFAULT_ICON}'">
                                 <span class="suggestion-name">${escapeHtml(site.name)}</span>
                                 <span class="suggestion-url">${escapeHtml(getDomain(site.url))}</span>
                             </a>

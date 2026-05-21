@@ -167,7 +167,7 @@ function renderSitesTable() {
     tbody.innerHTML = sites.map(site => {
         const id = safePositiveInteger(site.id);
         const siteUrl = safeHttpUrl(site.url);
-        const logoSrc = safeImageSrc(site.logo || getDefaultLogo(site.url));
+        const logoSrc = safeImageSrc(site.logo || DEFAULT_ICON);
         return `
     <tr data-id="${id}">
       <td style="text-align: center;"><input type="checkbox" class="site-checkbox" value="${id}" onchange="updateBulkActions()" style="cursor: pointer;"></td>
@@ -827,7 +827,9 @@ function updateLogoPreview(url) {
         img.src = safeImageSrc(url);
         img.alt = 'Logo Preview';
         img.onerror = () => {
-            img.style.display = 'none';
+            if (img.src !== DEFAULT_ICON) {
+                img.src = DEFAULT_ICON;
+            }
         };
         preview.appendChild(img);
         preview.classList.add('active');

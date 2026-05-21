@@ -320,7 +320,9 @@ export function initQuickAdd() {
             img.src = src;
             img.alt = 'Logo';
             img.onerror = () => {
-                img.style.display = 'none';
+                if (img.src !== DEFAULT_ICON) {
+                    img.src = DEFAULT_ICON;
+                }
             };
             quickAddLogoPreview.appendChild(img);
         }
