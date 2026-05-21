@@ -2,7 +2,7 @@
  * UI 模块 - DOM 操作和渲染
  */
 
-import { fetchSites, fetchCategories, fetchBackground, fetchTags, fetchSitesByTags } from './api.js';
+import { fetchSites, fetchCategories, fetchBackground, fetchTags, fetchSitesByTags, recordClick } from './api.js';
 import { setupLazyLoad, updateLoadMoreTrigger } from './lazyload.js';
 
 // 分页状态
@@ -170,6 +170,7 @@ export function createSiteCard(site) {
 
     // 点击跳转
     card.addEventListener('click', () => {
+        recordClick(safePositiveInteger(site.id)).catch(() => {});
         window.open(siteUrl, '_blank', 'noopener,noreferrer');
     });
 

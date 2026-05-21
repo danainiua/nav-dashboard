@@ -75,6 +75,16 @@ export async function saveSitesOrder(order) {
 }
 
 /**
+ * 记录站点点击
+ */
+export async function recordClick(siteId) {
+    const response = await fetch(`${API_BASE}/api/sites/${siteId}/click`, {
+        method: 'POST'
+    });
+    return await response.json();
+}
+
+/**
  * 获取标签列表
  */
 export async function fetchTags() {
