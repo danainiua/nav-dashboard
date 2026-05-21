@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录管理后台 - 导航站</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .login-card {
+            width: min(420px, 100%);
+            padding: 2.5rem;
+            border-radius: 18px;
+            text-align: center;
+        }
+
+        .login-card h1 {
+            margin-bottom: 0.5rem;
+            font-size: 1.9rem;
+            color: var(--text-primary);
+        }
+
+        .login-card p {
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            text-align: left;
+        }
+
+        .login-form label {
+            display: block;
+            margin-bottom: 0.4rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 0.85rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .login-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.2);
+        }
+
+        .login-actions {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+            margin-top: 0.25rem;
+        }
+
+        .login-btn {
+            justify-content: center;
+            width: 100%;
+            padding: 0.85rem;
+            font-size: 1rem;
+        }
+
+        .login-link {
+            color: var(--text-secondary);
+            text-align: center;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .login-link:hover {
+            color: var(--primary-color);
+        }
+
+        .login-error {
+            min-height: 1.25rem;
+            color: #ef4444;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .dark-mode .login-input {
+            color: white;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="login-card glass-effect">
+        <h1>🔐 管理后台</h1>
+        <p>登录后继续管理导航站</p>
+
+        <form id="loginForm" class="login-form" method="post" action="/api/auth/verify" autocomplete="on">
+            <div>
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" class="login-input" value="admin" autocomplete="username" required>
+            </div>
+            <div>
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" class="login-input" autocomplete="current-password" required autofocus>
+            </div>
+            <div class="login-actions">
+                <button type="submit" id="loginBtn" class="btn-primary login-btn">进入后台</button>
+                <a href="/" class="login-link">返回首页</a>
+            </div>
+            <div id="loginError" class="login-error" aria-live="polite"></div>
+        </form>
+    </main>
+
+    <script>
+        const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
+
+        function getNextUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const next = params.get('next') || '/admin.html';
+            try {
+                const url = new URL(next, window.location.origin);
+                return url.origin === window.location.origin ? url.pathname + url.search + url.hash : '/admin.html';
+            } catch {
+                return '/admin.html';
+            }
+        }
+
+        async function checkExistingSession() {
+            try {
+                const response = await fetch('/api/auth/status', { credentials: 'same-origin' });
+                const data = await response.json();
+                if (response.ok && data.success && data.authenticated) {
+                    window.location.href = getNextUrl();
+                }
+            } catch (error) {
+                // 保持登录表单可用
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const passwordInput = document.getElementById('password');
+            const errorEl = document.getElementById('loginError');
+            const loginBtn = document.getElementById('loginBtn');
+
+            errorEl.textContent = '';
+            loginBtn.disabled = true;
+            loginBtn.textContent = '验证中...';
+
+            try {
+                const response = await fetch('/api/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ password: passwordInput.value })
+                });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    sessionStorage.setItem('adminLoggedIn', 'true');
+                    sessionStorage.setItem('adminLoginTime', Date.now().toString());
+                    window.location.href = getNextUrl();
+                } else {
+                    errorEl.textContent = data.error || '密码错误';
+                    passwordInput.select();
+                }
+            } catch (error) {
+                errorEl.textContent = '网络错误，请重试';
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '进入后台';
+            }
+        });
+
+        checkExistingSession();
+    </script>
+</body>
+
+</html>

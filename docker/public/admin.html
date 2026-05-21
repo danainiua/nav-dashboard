@@ -234,16 +234,11 @@
 </head>
 
 <body>
-    <div id="loginOverlay" class="password-modal">
-        <form id="adminLoginForm" class="password-modal-content glass-effect" method="post" action="/api/auth/verify" autocomplete="off">
-            <h3>🔐 管理后台</h3>
-            <p id="loginDesc">输入管理密码后继续</p>
-            <input type="password" id="editPassword" placeholder="请输入密码" autocomplete="off" required>
-            <div class="password-modal-btns">
-                <button type="submit" id="adminLoginBtn" class="btn-primary">进入后台</button>
-            </div>
-            <div id="adminLoginError" class="password-error" aria-live="polite"></div>
-        </form>
+    <div id="loginOverlay" class="login-overlay">
+        <div class="login-box glass-effect">
+            <h2>🔐 管理后台</h2>
+            <p>正在验证登录状态...</p>
+        </div>
     </div>
 
     <div id="adminContent" class="container" style="display:none;">
@@ -721,7 +716,7 @@
                 // 忽略登出网络错误，本地状态已清理
             }
 
-            showAdminLogin('登录已退出，请重新输入管理密码');
+            redirectToLogin();
         }
 
         async function ensureServerAuth() {
@@ -736,61 +731,22 @@
             }
         }
 
-        function showAdminLogin(message = '') {
-            document.getElementById('adminContent').style.display = 'none';
-            document.getElementById('loginOverlay').style.display = 'flex';
-            document.getElementById('loginDesc').textContent = message || '输入管理密码后继续';
-            document.getElementById('adminLoginError').textContent = '';
-
-            const passwordInput = document.getElementById('editPassword');
-            if (!passwordInput.value) {
-                setTimeout(() => passwordInput.focus(), 0);
-            }
+        function redirectToLogin() {
+            const next = encodeURIComponent(window.location.pathname + window.location.search + window.location.hash);
+            window.location.href = `/login.html?next=${next}`;
         }
 
         function showAdminContent() {
             document.getElementById('loginOverlay').style.display = 'none';
             document.getElementById('adminContent').style.display = 'block';
             sessionStorage.setItem('adminLoggedIn', 'true');
-            sessionStorage.setItem('adminLoginTime', Date.now().toString());
+            if (!sessionStorage.getItem('adminLoginTime')) {
+                sessionStorage.setItem('adminLoginTime', Date.now().toString());
+            }
 
             if (!adminAppInitialized && window.initAdminApp) {
                 adminAppInitialized = true;
                 window.initAdminApp();
-            }
-        }
-
-        async function handleAdminLogin(e) {
-            e.preventDefault();
-            const passwordInput = document.getElementById('editPassword');
-            const errorEl = document.getElementById('adminLoginError');
-            const loginBtn = document.getElementById('adminLoginBtn');
-
-            errorEl.textContent = '';
-            loginBtn.disabled = true;
-            loginBtn.textContent = '验证中...';
-
-            try {
-                const response = await fetch('/api/auth/verify', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ password: passwordInput.value })
-                });
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    passwordInput.value = '';
-                    showAdminContent();
-                } else {
-                    errorEl.textContent = data.error || '密码错误';
-                    passwordInput.select();
-                }
-            } catch (error) {
-                errorEl.textContent = '网络错误，请重试';
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '进入后台';
             }
         }
 
@@ -867,8 +823,6 @@
         }
 
         async function initAdminAuth() {
-            document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
-
             const isServerAuthenticated = await ensureServerAuth();
             if (isServerAuthenticated && !isSessionExpired()) {
                 showAdminContent();
@@ -877,7 +831,7 @@
 
             sessionStorage.removeItem('adminLoggedIn');
             sessionStorage.removeItem('adminLoginTime');
-            showAdminLogin();
+            redirectToLogin();
         }
 
         initAdminAuth();
