@@ -20,10 +20,12 @@ let pageSize = 50;
 let totalSites = 0;
 let totalPages = 1;
 
-// DOM 加载完成后初始化
-document.addEventListener('DOMContentLoaded', () => {
+// 后台登录验证通过后由 admin.html 调用
+window.initAdminApp = init;
+
+if (document.getElementById('adminContent')?.style.display === 'block') {
     init();
-});
+}
 
 // 初始化
 async function init() {

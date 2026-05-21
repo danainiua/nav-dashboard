@@ -26,7 +26,7 @@
             padding: 2.5rem;
             border-radius: 16px;
             text-align: center;
-            max-width: 350px;
+            max-width: 380px;
             width: 90%;
         }
 
@@ -40,28 +40,39 @@
             margin-bottom: 1.5rem;
         }
 
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
         .login-input {
             width: 100%;
-            padding: 0.8rem 1rem;
+            padding: 0.85rem 1rem;
             background: rgba(255, 255, 255, 0.1);
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 8px;
             color: white;
             font-size: 1rem;
             outline: none;
-            margin-bottom: 1rem;
             text-align: center;
+        }
+
+        .login-input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(255, 154, 86, 0.12);
         }
 
         .login-btn {
             width: 100%;
-            padding: 0.8rem;
+            justify-content: center;
+            padding: 0.85rem;
             font-size: 1rem;
         }
 
         .login-error {
+            min-height: 1.25rem;
             color: #ff6b6b;
-            margin-top: 1rem;
             font-size: 0.9rem;
         }
 
@@ -223,11 +234,15 @@
 </head>
 
 <body>
-    <!-- 加载提示（未验证会立即跳转） -->
     <div id="loginOverlay" class="login-overlay">
         <div class="login-box glass-effect">
             <h2>🔐 管理后台</h2>
-            <p>正在验证...</p>
+            <p id="loginDesc">输入管理密码后继续</p>
+            <form id="adminLoginForm" class="login-form">
+                <input type="password" id="adminLoginPassword" class="login-input" placeholder="管理密码" autocomplete="current-password" required>
+                <button type="submit" id="adminLoginBtn" class="btn-primary login-btn">进入后台</button>
+                <div id="adminLoginError" class="login-error" aria-live="polite"></div>
+            </form>
         </div>
     </div>
 
@@ -684,6 +699,7 @@
     <script>
         // Session过期时间（2小时）
         const SESSION_TIMEOUT = 2 * 60 * 60 * 1000;
+        let adminAppInitialized = false;
 
         function isSessionExpired() {
             const loginTime = sessionStorage.getItem('adminLoginTime');
@@ -691,12 +707,21 @@
             return Date.now() - parseInt(loginTime) > SESSION_TIMEOUT;
         }
 
-        function logout() {
+        async function logout() {
             sessionStorage.removeItem('adminLoggedIn');
             sessionStorage.removeItem('adminLoginTime');
             sessionStorage.removeItem('editModeUnlocked');
-            // 跳转回主页
-            window.location.href = '/';
+
+            try {
+                await fetch('/api/auth/logout', {
+                    method: 'POST',
+                    credentials: 'same-origin'
+                });
+            } catch (error) {
+                // 忽略登出网络错误，本地状态已清理
+            }
+
+            showAdminLogin('登录已退出，请重新输入管理密码');
         }
 
         async function ensureServerAuth() {
@@ -711,8 +736,59 @@
             }
         }
 
-        function enablePasswordForm() {
-            // 不再需要，改为动态生成
+        function showAdminLogin(message = '') {
+            document.getElementById('adminContent').style.display = 'none';
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('loginDesc').textContent = message || '输入管理密码后继续';
+            document.getElementById('adminLoginError').textContent = '';
+            document.getElementById('adminLoginPassword').value = '';
+            setTimeout(() => document.getElementById('adminLoginPassword').focus(), 0);
+        }
+
+        function showAdminContent() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('adminContent').style.display = 'block';
+            sessionStorage.setItem('adminLoggedIn', 'true');
+            sessionStorage.setItem('adminLoginTime', Date.now().toString());
+
+            if (!adminAppInitialized && window.initAdminApp) {
+                adminAppInitialized = true;
+                window.initAdminApp();
+            }
+        }
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            const passwordInput = document.getElementById('adminLoginPassword');
+            const errorEl = document.getElementById('adminLoginError');
+            const loginBtn = document.getElementById('adminLoginBtn');
+
+            errorEl.textContent = '';
+            loginBtn.disabled = true;
+            loginBtn.textContent = '验证中...';
+
+            try {
+                const response = await fetch('/api/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ password: passwordInput.value })
+                });
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    passwordInput.value = '';
+                    showAdminContent();
+                } else {
+                    errorEl.textContent = data.error || '密码错误';
+                    passwordInput.select();
+                }
+            } catch (error) {
+                errorEl.textContent = '网络错误，请重试';
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '进入后台';
+            }
         }
 
         // 动态生成密码表单
@@ -788,33 +864,17 @@
         }
 
         async function initAdminAuth() {
-            const hasLocalSession = sessionStorage.getItem('editModeUnlocked') === 'true' ||
-                (sessionStorage.getItem('adminLoggedIn') === 'true' && !isSessionExpired());
+            document.getElementById('adminLoginForm').addEventListener('submit', handleAdminLogin);
 
             const isServerAuthenticated = await ensureServerAuth();
-
-            if (!hasLocalSession && !isServerAuthenticated) {
-                sessionStorage.removeItem('adminLoggedIn');
-                sessionStorage.removeItem('adminLoginTime');
-                window.location.href = '/';
+            if (isServerAuthenticated && !isSessionExpired()) {
+                showAdminContent();
                 return;
             }
 
-            if (!isServerAuthenticated) {
-                sessionStorage.removeItem('adminLoggedIn');
-                sessionStorage.removeItem('adminLoginTime');
-                sessionStorage.removeItem('editModeUnlocked');
-                alert('登录状态已失效，请重新验证后再进入管理后台');
-                window.location.href = '/';
-                return;
-            }
-
-            document.getElementById('loginOverlay').style.display = 'none';
-            document.getElementById('adminContent').style.display = 'block';
-            sessionStorage.setItem('adminLoggedIn', 'true');
-            if (!sessionStorage.getItem('adminLoginTime')) {
-                sessionStorage.setItem('adminLoginTime', Date.now().toString());
-            }
+            sessionStorage.removeItem('adminLoggedIn');
+            sessionStorage.removeItem('adminLoginTime');
+            showAdminLogin();
         }
 
         initAdminAuth();
@@ -822,7 +882,6 @@
         setInterval(() => {
             if (sessionStorage.getItem('adminLoggedIn') === 'true' && isSessionExpired()) {
                 logout();
-                alert('登录已过期，请重新登录');
             }
         }, 60000);
     </script>

@@ -10,16 +10,14 @@ const DEFAULT_ICON = '/default-icon.png';
 
 // 存储待执行的回调
 let pendingQuickAddAction = null;
-// 标记是否为管理后台验证
-let pendingAdminRedirect = false;
-let pendingAdminWindow = null;
 
 function openAdminPageInNewTab() {
-    const adminWindow = window.open('about:blank', '_blank');
+    const adminWindow = window.open('/admin.html', '_blank');
     if (!adminWindow) {
         alert('浏览器拦截了管理后台新标签页，请允许此站点打开弹窗后重试');
         return null;
     }
+    adminWindow.focus();
     return adminWindow;
 }
 
@@ -84,7 +82,6 @@ export function initEditMode() {
                     editModeBtn.classList.add('active');
                     editModeBtn.querySelector('span:last-child').textContent = '退出编辑';
                 } else {
-                    pendingAdminRedirect = false;
                     showPasswordModal('🔐 解锁编辑模式', '输入管理密码以启用拖拽排序');
                 }
             }
@@ -97,27 +94,7 @@ export function initEditMode() {
             e.stopPropagation();
             gearMenu.style.display = 'none';
 
-            // 如果已经验证过，直接跳转
-            if (sessionStorage.getItem('editModeUnlocked') === 'true') {
-                const adminWindow = openAdminPageInNewTab();
-                if (adminWindow) {
-                    adminWindow.location.href = '/admin.html';
-                    adminWindow.focus();
-                }
-            } else {
-                // 需要验证密码
-                pendingAdminRedirect = true;
-                pendingQuickAddAction = null;
-                pendingAdminWindow = openAdminPageInNewTab();
-                if (!pendingAdminWindow) {
-                    pendingAdminRedirect = false;
-                    return;
-                }
-                // 延迟显示密码框，避免被 document click 事件关闭
-                setTimeout(() => {
-                    showPasswordModal('⚙️ 管理后台', '输入管理密码以进入后台');
-                }, 10);
-            }
+            openAdminPageInNewTab();
         });
     }
 
@@ -138,12 +115,6 @@ export function initEditMode() {
             passwordInput.value = '';
             passwordError.textContent = '';
 
-            if (pendingAdminRedirect && pendingAdminWindow && !pendingAdminWindow.closed) {
-                pendingAdminWindow.close();
-            }
-
-            pendingAdminRedirect = false;
-            pendingAdminWindow = null;
         });
     }
 
@@ -154,12 +125,6 @@ export function initEditMode() {
                 passwordModal.style.display = 'none';
                 passwordInput.value = '';
 
-                if (pendingAdminRedirect && pendingAdminWindow && !pendingAdminWindow.closed) {
-                    pendingAdminWindow.close();
-                }
-
-                pendingAdminRedirect = false;
-                pendingAdminWindow = null;
             }
         });
     }
@@ -182,20 +147,6 @@ async function handleVerifyPassword() {
             passwordModal.style.display = 'none';
             passwordInput.value = '';
 
-            // 如果是管理后台验证，跳转到管理页面
-            if (pendingAdminRedirect) {
-                pendingAdminRedirect = false;
-
-                if (pendingAdminWindow && !pendingAdminWindow.closed) {
-                    pendingAdminWindow.location.href = '/admin.html';
-                    pendingAdminWindow.focus();
-                } else {
-                    openAdminPageInNewTab();
-                }
-
-                pendingAdminWindow = null;
-                return;
-            }
 
             if (pendingQuickAddAction) {
                 pendingQuickAddAction();
