@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const categorySelect = document.getElementById('category');
     const logoInput = document.getElementById('logo');
     const logoImg = document.getElementById('logo-img');
+    const logoModeSelect = document.getElementById('logo-mode');
     const submitBtn = document.getElementById('submit-btn');
     const optionsBtn = document.getElementById('options-btn');
     const messageDiv = document.getElementById('message');
@@ -13,6 +14,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     let apiUrl = '';
     let password = '';
+    let currentFavIconUrl = '';
+    let currentPageUrl = '';
+
+    const DEFAULT_ICON = '/default-icon.png';
 
     // 加载配置
     const config = await chrome.storage.sync.get(['apiUrl', 'password']);
@@ -49,44 +54,66 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // 设置Logo - 支持多个图标API fallback
-    function setLogo(favIconUrl, pageUrl) {
-        let logoUrl = favIconUrl;
-        let domain = '';
-
-        if (pageUrl) {
-            try {
-                domain = new URL(pageUrl).hostname;
-            } catch (e) {
-                domain = '';
-            }
+    function getDomain(pageUrl) {
+        try {
+            return new URL(pageUrl).hostname;
+        } catch (e) {
+            return '';
         }
+    }
 
-        // 如果没有 favicon，使用 Google API
-        if (!logoUrl && domain) {
-            logoUrl = `https://www.google.com/s2/favicons?sz=128&domain=${domain}`;
-        }
+    function getAutoFaviconUrl(pageUrl) {
+        const domain = getDomain(pageUrl);
+        return domain ? `https://www.google.com/s2/favicons?sz=128&domain=${domain}` : '';
+    }
 
+    function setPreviewLogo(logoUrl, fallbackUrls = [], previewUrl = logoUrl) {
         logoInput.value = logoUrl;
-        logoImg.src = logoUrl || getPlaceholderIcon();
+        logoImg.src = previewUrl || getPlaceholderIcon();
 
-        // 图标加载失败时，依次尝试备用 API
         let fallbackIndex = 0;
-        const fallbackApis = domain ? [
-            `https://icons.duckduckgo.com/ip3/${domain}.ico`,
-            `https://favicon.im/${domain}`,
-            `https://www.google.com/s2/favicons?sz=64&domain=${domain}`
-        ] : [];
-
         logoImg.onerror = () => {
-            if (fallbackIndex < fallbackApis.length) {
-                const nextUrl = fallbackApis[fallbackIndex++];
+            if (fallbackIndex < fallbackUrls.length) {
+                const nextUrl = fallbackUrls[fallbackIndex++];
                 logoImg.src = nextUrl;
                 logoInput.value = nextUrl;
             } else {
                 logoImg.src = getPlaceholderIcon();
             }
         };
+    }
+
+    function updateLogoByMode() {
+        const mode = logoModeSelect.value;
+        const domain = getDomain(currentPageUrl);
+
+        if (mode === 'default') {
+            setPreviewLogo(DEFAULT_ICON, [], apiUrl ? `${apiUrl}${DEFAULT_ICON}` : DEFAULT_ICON);
+            return;
+        }
+
+        if (mode === 'browser') {
+            const fallbackUrls = domain ? [
+                getAutoFaviconUrl(currentPageUrl),
+                `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+                `https://favicon.im/${domain}`
+            ].filter(Boolean) : [];
+            setPreviewLogo(currentFavIconUrl || getAutoFaviconUrl(currentPageUrl), fallbackUrls);
+            return;
+        }
+
+        const fallbackUrls = domain ? [
+            `https://icons.duckduckgo.com/ip3/${domain}.ico`,
+            `https://favicon.im/${domain}`
+        ] : [];
+        setPreviewLogo(getAutoFaviconUrl(currentPageUrl), fallbackUrls);
+    }
+
+    // 设置Logo
+    function setLogo(favIconUrl, pageUrl) {
+        currentFavIconUrl = favIconUrl || '';
+        currentPageUrl = pageUrl || '';
+        updateLogoByMode();
     }
 
     // 获取占位图标
@@ -213,6 +240,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     goOptionsBtn?.addEventListener('click', () => {
         chrome.runtime.openOptionsPage();
     });
+
+    logoModeSelect.addEventListener('change', updateLogoByMode);
 
     // URL变化时更新Logo
     urlInput.addEventListener('blur', () => {
