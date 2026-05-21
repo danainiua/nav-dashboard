@@ -9,7 +9,7 @@ const STATIC_ASSETS = [
     '/css/admin.css',
     '/js/main.js',
     '/js/admin.js',
-    '/favicon.svg'
+    '/favicon.png'
 ];
 
 // Install - cache static assets
