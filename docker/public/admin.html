@@ -234,16 +234,16 @@
 </head>
 
 <body>
-    <div id="loginOverlay" class="login-overlay">
-        <div class="login-box glass-effect">
-            <h2>🔐 管理后台</h2>
+    <div id="loginOverlay" class="password-modal">
+        <form id="adminLoginForm" class="password-modal-content glass-effect" method="post" action="/api/auth/verify" autocomplete="off">
+            <h3>🔐 管理后台</h3>
             <p id="loginDesc">输入管理密码后继续</p>
-            <form id="adminLoginForm" class="login-form" method="post" action="/api/auth/verify" autocomplete="off">
-                <input type="password" id="editPassword" name="password" class="login-input" placeholder="请输入密码" autocomplete="off" required autofocus>
-                <button type="submit" id="adminLoginBtn" class="btn-primary login-btn">进入后台</button>
-                <div id="adminLoginError" class="login-error" aria-live="polite"></div>
-            </form>
-        </div>
+            <input type="password" id="editPassword" placeholder="请输入密码" autocomplete="off" required>
+            <div class="password-modal-btns">
+                <button type="submit" id="adminLoginBtn" class="btn-primary">进入后台</button>
+            </div>
+            <div id="adminLoginError" class="password-error" aria-live="polite"></div>
+        </form>
     </div>
 
     <div id="adminContent" class="container" style="display:none;">
@@ -741,8 +741,11 @@
             document.getElementById('loginOverlay').style.display = 'flex';
             document.getElementById('loginDesc').textContent = message || '输入管理密码后继续';
             document.getElementById('adminLoginError').textContent = '';
-            document.getElementById('editPassword').value = '';
-            setTimeout(() => document.getElementById('editPassword').focus(), 0);
+
+            const passwordInput = document.getElementById('editPassword');
+            if (!passwordInput.value) {
+                setTimeout(() => passwordInput.focus(), 0);
+            }
         }
 
         function showAdminContent() {
