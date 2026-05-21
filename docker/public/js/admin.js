@@ -167,7 +167,7 @@ function renderSitesTable() {
     tbody.innerHTML = sites.map(site => {
         const id = safePositiveInteger(site.id);
         const siteUrl = safeHttpUrl(site.url);
-        const logoSrc = safeImageSrc(site.logo || DEFAULT_ICON);
+        const logoSrc = displayLogoForSite(site);
         return `
     <tr data-id="${id}">
       <td style="text-align: center;"><input type="checkbox" class="site-checkbox" value="${id}" onchange="updateBulkActions()" style="cursor: pointer;"></td>
@@ -940,6 +940,20 @@ function safeImageSrc(value, fallback = DEFAULT_ICON) {
         return src;
     }
     return safeHttpUrl(src, fallback);
+}
+
+function faviconFromSiteUrl(siteUrl) {
+    try {
+        const hostname = new URL(String(siteUrl || '')).hostname;
+        return hostname ? `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(hostname)}` : DEFAULT_ICON;
+    } catch {
+        return DEFAULT_ICON;
+    }
+}
+
+function displayLogoForSite(site) {
+    const logo = String(site.logo || '').trim();
+    return safeImageSrc(!logo || logo === DEFAULT_ICON ? faviconFromSiteUrl(site.url) : logo);
 }
 
 function safePositiveInteger(value, fallback = 0) {

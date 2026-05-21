@@ -48,6 +48,20 @@ function safeImageSrc(value, fallback = DEFAULT_ICON) {
     return safeHttpUrl(src, fallback);
 }
 
+function faviconFromSiteUrl(siteUrl) {
+    try {
+        const hostname = new URL(String(siteUrl || '')).hostname;
+        return hostname ? `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(hostname)}` : DEFAULT_ICON;
+    } catch {
+        return DEFAULT_ICON;
+    }
+}
+
+function displayLogoForSite(site) {
+    const logo = String(site.logo || '').trim();
+    return safeImageSrc(!logo || logo === DEFAULT_ICON ? faviconFromSiteUrl(site.url) : logo);
+}
+
 function safePositiveInteger(value, fallback = 0) {
     const number = Number(value);
     return Number.isInteger(number) && number > 0 ? number : fallback;
@@ -116,7 +130,7 @@ export function hideSkeletons() {
  * 创建站点卡片
  */
 export function createSiteCard(site) {
-    const logo = safeImageSrc(site.logo || DEFAULT_ICON);
+    const logo = displayLogoForSite(site);
     const siteUrl = safeHttpUrl(site.url);
 
     const card = document.createElement('div');

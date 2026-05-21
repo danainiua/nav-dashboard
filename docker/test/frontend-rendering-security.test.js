@@ -27,11 +27,15 @@ test('homepage rendering escapes site, tag and search suggestion data', () => {
     const quickAddJs = read('public/js/modules/quickAdd.js');
 
     assert.match(uiJs, /function safeImageSrc/);
+    assert.match(uiJs, /function displayLogoForSite/);
+    assert.match(uiJs, /faviconFromSiteUrl\(site\.url\)/);
     assert.match(uiJs, /\$\{escapeHtml\(site\.name\)\}/);
     assert.match(uiJs, /\$\{escapeHtml\(tag\.name\)\}/);
     assert.match(searchJs, /\$\{escapeHtml\(site\.name\)\}/);
     assert.match(searchJs, /\$\{escapeAttr\(safeHttpUrl\(site\.url\)\)\}/);
     assert.match(searchJs, /const DEFAULT_ICON = '\/default-icon\.png'/);
+    assert.match(searchJs, /function displayLogoForSite/);
+    assert.match(searchJs, /faviconFromSiteUrl\(site\.url\)/);
     assert.match(searchJs, /this\.src='\$\{DEFAULT_ICON\}'/);
     assert.doesNotMatch(searchJs, /href="\$\{site\.url\}"/);
     assert.match(quickAddJs, /img\.src = DEFAULT_ICON/);

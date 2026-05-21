@@ -33,6 +33,20 @@ function safeImageSrc(value, fallback = DEFAULT_ICON) {
     return safeHttpUrl(src, fallback);
 }
 
+function faviconFromSiteUrl(siteUrl) {
+    try {
+        const hostname = new URL(String(siteUrl || '')).hostname;
+        return hostname ? `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(hostname)}` : DEFAULT_ICON;
+    } catch {
+        return DEFAULT_ICON;
+    }
+}
+
+function displayLogoForSite(site) {
+    const logo = String(site.logo || '').trim();
+    return safeImageSrc(!logo || logo === DEFAULT_ICON ? faviconFromSiteUrl(site.url) : logo);
+}
+
 /**
  * 设置搜索功能
  */
@@ -90,7 +104,7 @@ export function setupSearch() {
                         <div class="suggestion-header">📌 站内匹配</div>
                         ${matches.map(site => `
                             <a href="${escapeAttr(safeHttpUrl(site.url))}" target="_blank" rel="noopener noreferrer" class="suggestion-item">
-                                <img src="${escapeAttr(safeImageSrc(site.logo || DEFAULT_ICON))}" alt="" onerror="if (this.src !== '${DEFAULT_ICON}') this.src='${DEFAULT_ICON}'">
+                                <img src="${escapeAttr(displayLogoForSite(site))}" alt="" onerror="if (this.src !== '${DEFAULT_ICON}') this.src='${DEFAULT_ICON}'">
                                 <span class="suggestion-name">${escapeHtml(site.name)}</span>
                                 <span class="suggestion-url">${escapeHtml(getDomain(site.url))}</span>
                             </a>
