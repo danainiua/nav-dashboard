@@ -161,36 +161,41 @@ function renderSitesTable() {
         if (currentSearchTerm) msg = '未找到匹配的站点';
         else if (currentCategoryFilter !== 'all') msg = '该分类下暂无站点';
         else if (currentStatusFilter !== 'all') msg = '该状态下暂无站点';
-        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem;">${msg}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; padding: 2rem;">${escapeHtml(msg)}</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = sites.map(site => `
-    <tr data-id="${site.id}">
-      <td style="text-align: center;"><input type="checkbox" class="site-checkbox" value="${site.id}" onchange="updateBulkActions()" style="cursor: pointer;"></td>
+    tbody.innerHTML = sites.map(site => {
+        const id = safePositiveInteger(site.id);
+        const siteUrl = safeHttpUrl(site.url);
+        const logoSrc = safeImageSrc(site.logo || getDefaultLogo(site.url));
+        return `
+    <tr data-id="${id}">
+      <td style="text-align: center;"><input type="checkbox" class="site-checkbox" value="${id}" onchange="updateBulkActions()" style="cursor: pointer;"></td>
       <td class="drag-handle" style="cursor: grab; padding: 0.5rem; color: rgba(255,255,255,0.6); font-size: 1.2rem; text-align: center;">⋮⋮</td>
       <td>
-        <img src="${site.logo || getDefaultLogo(site.url)}" 
-             alt="${site.name}" 
+        <img src="${escapeAttr(logoSrc)}"
+             alt="${escapeAttr(site.name)}"
              class="table-logo"
              loading="lazy"
-             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2232%22 height=%2232%22><text y=%2224%22 font-size=%2224%22>🌐</text></svg>'">
+             onerror="this.src='${DEFAULT_ICON}'">
       </td>
       <td>${escapeHtml(site.name)}</td>
-      <td><a href="${site.url}" target="_blank" style="color: var(--primary-color)">${getDomain(site.url)}</a></td>
-      <td>${site.category_name || '-'}</td>
+      <td><a href="${escapeAttr(siteUrl)}" target="_blank" rel="noopener noreferrer" style="color: var(--primary-color)">${escapeHtml(getDomain(site.url))}</a></td>
+      <td>${escapeHtml(site.category_name || '-')}</td>
       <td>${renderSiteStatus(site)}</td>
       <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(site.description || '-')}</td>
-      <td>${site.sort_order}</td>
+      <td>${safeNonNegativeInteger(site.sort_order)}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" onclick="checkSite(${site.id})" title="检测可用性">🔄</button>
-          <button class="btn-icon" onclick="editSite(${site.id})" title="编辑">✏️</button>
-          <button class="btn-icon danger" onclick="deleteSite(${site.id})" title="删除">🗑️</button>
+          <button class="btn-icon" onclick="checkSite(${id})" title="检测可用性">🔄</button>
+          <button class="btn-icon" onclick="editSite(${id})" title="编辑">✏️</button>
+          <button class="btn-icon danger" onclick="deleteSite(${id})" title="删除">🗑️</button>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+    }).join('');
 
     // 初始化拖拽排序
     initSortable();
@@ -302,7 +307,7 @@ function populateCategorySelect() {
     const currentValue = select.value;
 
     select.innerHTML = '<option value="">无分类</option>' +
-        categories.map(cat => `<option value="${cat.id}">${cat.icon || ''} ${cat.name}</option>`).join('');
+        categories.map(cat => `<option value="${safePositiveInteger(cat.id)}">${escapeHtml(cat.icon || '')} ${escapeHtml(cat.name)}</option>`).join('');
 
     select.value = currentValue;
 }
@@ -607,7 +612,7 @@ function populateCategoryFilter() {
 
     const currentValue = select.value;
     select.innerHTML = '<option value="all">📁 全部分类</option>' +
-        categories.map(cat => `<option value="${cat.id}">${cat.icon || '📁'} ${cat.name}</option>`).join('');
+        categories.map(cat => `<option value="${safePositiveInteger(cat.id)}">${escapeHtml(cat.icon || '📁')} ${escapeHtml(cat.name)}</option>`).join('');
     select.value = currentValue;
 }
 
@@ -620,25 +625,29 @@ function renderCategoriesTable() {
         return;
     }
 
-    tbody.innerHTML = categories.map(cat => `
-    <tr data-id="${cat.id}">
+    tbody.innerHTML = categories.map(cat => {
+        const id = safePositiveInteger(cat.id);
+        const color = safeCssColor(cat.color, '#ff9a56');
+        return `
+    <tr data-id="${id}">
       <td class="drag-handle" style="cursor: grab; padding: 0.5rem; color: rgba(255,255,255,0.6); font-size: 1.2rem; text-align: center;">⋮⋮</td>
-      <td class="table-icon">${cat.icon || '-'}</td>
+      <td class="table-icon">${escapeHtml(cat.icon || '-')}</td>
       <td>${escapeHtml(cat.name)}</td>
       <td>
-        <span class="color-badge" style="background-color: ${cat.color}"></span>
-        <span style="margin-left: 0.5rem;">${cat.color}</span>
+        <span class="color-badge" style="background-color: ${color}"></span>
+        <span style="margin-left: 0.5rem;">${escapeHtml(color)}</span>
       </td>
-      <td>${cat.sites_count || 0}</td>
-      <td>${cat.sort_order}</td>
+      <td>${safeNonNegativeInteger(cat.sites_count)}</td>
+      <td>${safeNonNegativeInteger(cat.sort_order)}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" onclick="editCategory(${cat.id})" title="编辑">✏️</button>
-          <button class="btn-icon danger" onclick="deleteCategory(${cat.id})" title="删除">🗑️</button>
+          <button class="btn-icon" onclick="editCategory(${id})" title="编辑">✏️</button>
+          <button class="btn-icon danger" onclick="deleteCategory(${id})" title="删除">🗑️</button>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+    }).join('');
 
     // 初始化分类拖拽排序
     initCategorySortable();
@@ -814,7 +823,14 @@ function updateLogoPreview(url) {
     const preview = document.getElementById('logoPreview');
 
     if (url && url.trim()) {
-        preview.innerHTML = `<img src="${url}" alt="Logo Preview" onerror="this.style.display='none'">`;
+        preview.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = safeImageSrc(url);
+        img.alt = 'Logo Preview';
+        img.onerror = () => {
+            img.style.display = 'none';
+        };
+        preview.appendChild(img);
         preview.classList.add('active');
     } else {
         preview.classList.remove('active');
@@ -896,8 +912,43 @@ function useDefaultLogo() {
 // HTML 转义
 function escapeHtml(text) {
     const div = document.createElement('div');
-    div.textContent = text;
+    div.textContent = text ?? '';
     return div.innerHTML;
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+function safeCssColor(value, fallback = '#6366f1') {
+    return /^#[0-9A-Fa-f]{6}$/.test(String(value || '')) ? value : fallback;
+}
+
+function safeHttpUrl(value, fallback = '#') {
+    try {
+        const url = new URL(String(value || ''), window.location.origin);
+        return ['http:', 'https:'].includes(url.protocol) ? url.toString() : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function safeImageSrc(value, fallback = DEFAULT_ICON) {
+    const src = String(value || '').trim();
+    if (src === DEFAULT_ICON || src.startsWith('/api/images/')) {
+        return src;
+    }
+    return safeHttpUrl(src, fallback);
+}
+
+function safePositiveInteger(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isInteger(number) && number > 0 ? number : fallback;
+}
+
+function safeNonNegativeInteger(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isInteger(number) && number >= 0 ? number : fallback;
 }
 
 // 显示通知 (Toast)
@@ -914,7 +965,7 @@ function showNotification(message, type = 'info') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
-    toast.innerHTML = `${icon} ${message}`;
+    toast.textContent = `${icon} ${message}`;
     container.appendChild(toast);
 
     // 3秒后自动消失
@@ -1135,25 +1186,29 @@ function renderTagsTable() {
         return;
     }
 
-    tbody.innerHTML = tags.map(tag => `
-    <tr data-id="${tag.id}">
+    tbody.innerHTML = tags.map(tag => {
+        const id = safePositiveInteger(tag.id);
+        const color = safeCssColor(tag.color);
+        return `
+    <tr data-id="${id}">
       <td>
-        <span class="color-badge" style="background-color: ${tag.color}; width: 24px; height: 24px; border-radius: 50%; display: inline-block;"></span>
+        <span class="color-badge" style="background-color: ${color}; width: 24px; height: 24px; border-radius: 50%; display: inline-block;"></span>
       </td>
       <td>
-        <span class="tag-badge" style="background-color: ${tag.color}; color: white; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.9rem;">
+        <span class="tag-badge" style="background-color: ${color}; color: white; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.9rem;">
           ${escapeHtml(tag.name)}
         </span>
       </td>
-      <td>${tag.sites_count || 0}</td>
+      <td>${safeNonNegativeInteger(tag.sites_count)}</td>
       <td>
         <div class="action-buttons">
-          <button class="btn-icon" onclick="editTag(${tag.id})" title="编辑">✏️</button>
-          <button class="btn-icon danger" onclick="deleteTag(${tag.id})" title="删除">🗑️</button>
+          <button class="btn-icon" onclick="editTag(${id})" title="编辑">✏️</button>
+          <button class="btn-icon danger" onclick="deleteTag(${id})" title="删除">🗑️</button>
         </div>
       </td>
     </tr>
-  `).join('');
+  `;
+    }).join('');
 }
 
 // 打开标签模态框（新建）
@@ -1258,13 +1313,17 @@ function populateSiteTagsSelect(selectedTagIds = []) {
         return;
     }
 
-    container.innerHTML = tags.map(tag => `
-        <input type="checkbox" class="tag-checkbox" id="siteTag_${tag.id}"
-               value="${tag.id}" ${selectedTagIds.includes(tag.id) ? 'checked' : ''}>
-        <label for="siteTag_${tag.id}" style="background-color: ${tag.color}; color: white;">
+    container.innerHTML = tags.map(tag => {
+        const id = safePositiveInteger(tag.id);
+        const color = safeCssColor(tag.color);
+        return `
+        <input type="checkbox" class="tag-checkbox" id="siteTag_${id}"
+               value="${id}" ${selectedTagIds.includes(id) ? 'checked' : ''}>
+        <label for="siteTag_${id}" style="background-color: ${color}; color: white;">
             ${escapeHtml(tag.name)}
         </label>
-    `).join('');
+    `;
+    }).join('');
 }
 
 // 获取选中的标签IDs

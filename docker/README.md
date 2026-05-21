@@ -2,6 +2,8 @@
 
 一个基于卡片式布局的现代化导航站点，采用磨砂玻璃设计风格，支持 Docker 自托管部署。这是目前项目的主要维护版本。
 
+> 维护状态：Docker 版是主维护线，后续新功能和安全加固默认只进入 Docker 版；Cloudflare 版仅保留给既有部署兼容使用。
+
 ![导航站截图](../screenshot.png)
 
 ## ✨ 特性
@@ -63,6 +65,10 @@ docker run -d \
 | `PORT` | `3000` | 服务端口 |
 | `ADMIN_PASSWORD` | *(必填，无安全默认值建议)* | 管理后台密码 |
 | `TZ` | `UTC` | 时区 |
+| `CORS_ORIGINS` | *(空)* | 允许跨域访问的来源，多个来源用英文逗号分隔；为空时仅同源/无 Origin 请求可用 |
+| `COOKIE_SECURE` | `false` | 设为 `true` 时登录 Cookie 添加 `Secure` 属性，适合 HTTPS 部署 |
+| `TRUST_PROXY` | `false` | 反向代理 HTTPS 部署时设为 `true`，同时信任代理并启用安全 Cookie 判断 |
+| `ALLOWED_IMAGE_DOMAINS` | *(内置常用图标源)* | 额外允许代理/缓存远程图标的域名，多个域名用英文逗号分隔 |
 
 ### 数据持久化
 
@@ -101,7 +107,7 @@ docker/
 npm test
 ```
 
-当前最小测试覆盖 Docker 端的服务启动结构和关键鉴权边界。
+当前测试覆盖 Docker 端服务启动、鉴权边界、输入校验、图片上传/代理、导入/备份恢复和前端渲染安全回归。
 
 ## 📄 许可证
 

@@ -4,6 +4,14 @@
  */
 
 const cron = require('node-cron');
+const {
+    validateSiteData,
+    validateCategoryData,
+    validateTagData,
+    validateBackupFilename,
+    parseNonNegativeInteger,
+    parsePositiveInteger
+} = require('./utils/validator');
 
 let webdavClient = null;
 let cronJob = null;
@@ -26,6 +34,71 @@ function normalizeSettingsEntries(settings) {
     }
 
     return [];
+}
+
+function validateRestoreData(data) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.categories) || !Array.isArray(data.sites)) {
+        throw new Error('备份文件格式无效');
+    }
+
+    const tags = Array.isArray(data.tags) ? data.tags : [];
+    const siteTags = Array.isArray(data.site_tags) ? data.site_tags : [];
+    const settings = normalizeSettingsEntries(data.settings);
+    const categories = [];
+    const sites = [];
+    const validatedTags = [];
+    const categoryIds = new Set();
+    const siteIds = new Set();
+    const tagIds = new Set();
+
+    for (const cat of data.categories) {
+        const id = parsePositiveInteger(cat?.id);
+        const validation = validateCategoryData(cat);
+        const sortOrder = parseNonNegativeInteger(cat?.sort_order, 0);
+        if (!id || categoryIds.has(id) || !validation.valid || sortOrder === null) {
+            throw new Error(validation.error || '分类数据无效');
+        }
+        categoryIds.add(id);
+        categories.push({ id, data: validation.sanitized, sortOrder });
+    }
+
+    for (const site of data.sites) {
+        const id = parsePositiveInteger(site?.id);
+        const validation = validateSiteData(site);
+        const sortOrder = parseNonNegativeInteger(site?.sort_order, 0);
+        const categoryId = site?.category_id === null || site?.category_id === undefined || site?.category_id === '' ? null : parsePositiveInteger(site.category_id);
+        if (!id || siteIds.has(id) || !validation.valid || sortOrder === null || (site?.category_id && !categoryId) || (categoryId && !categoryIds.has(categoryId))) {
+            throw new Error(validation.error || '站点数据无效');
+        }
+        siteIds.add(id);
+        sites.push({ id, data: validation.sanitized, categoryId, sortOrder });
+    }
+
+    for (const tag of tags) {
+        const id = parsePositiveInteger(tag?.id);
+        const validation = validateTagData(tag);
+        if (!id || tagIds.has(id) || !validation.valid) {
+            throw new Error(validation.error || '标签数据无效');
+        }
+        tagIds.add(id);
+        validatedTags.push({ id, data: validation.sanitized });
+    }
+
+    for (const row of siteTags) {
+        const siteId = parsePositiveInteger(row?.site_id);
+        const tagId = parsePositiveInteger(row?.tag_id);
+        if (!siteId || !tagId || !siteIds.has(siteId) || !tagIds.has(tagId)) {
+            throw new Error('站点标签关联数据无效');
+        }
+    }
+
+    for (const entry of settings) {
+        if (!entry.key || typeof entry.key !== 'string' || entry.key.length > 100) {
+            throw new Error('设置数据无效');
+        }
+    }
+
+    return { categories, sites, tags: validatedTags, siteTags, settings };
 }
 
 // 动态导入 webdav (ESM 模块)
@@ -275,6 +348,15 @@ async function listBackups(db) {
 
 // 从 WebDAV 恢复数据
 async function restoreBackup(db, filename, path = null) {
+    const filenameValidation = validateBackupFilename(filename);
+    if (!filenameValidation.valid) {
+        throw new Error(filenameValidation.error);
+    }
+
+    if (path && ![`/nav-backup/${filename}`, `/${filename}`].includes(path)) {
+        throw new Error('备份文件路径无效');
+    }
+
     const config = getBackupConfig(db);
 
     if (!config.webdav_url || !config.webdav_username || !config.webdav_password) {
@@ -308,15 +390,7 @@ async function restoreBackup(db, filename, path = null) {
     }
 
     const data = JSON.parse(content);
-
-    // 验证数据格式
-    if (!Array.isArray(data.categories) || !Array.isArray(data.sites)) {
-        throw new Error('备份文件格式无效');
-    }
-
-    const tags = Array.isArray(data.tags) ? data.tags : [];
-    const siteTags = Array.isArray(data.site_tags) ? data.site_tags : [];
-    const settings = normalizeSettingsEntries(data.settings);
+    const validatedData = validateRestoreData(data);
 
     // 原子恢复：所有数据在单一事务内完成，失败则整体回滚
     const restoreTransaction = db.transaction(() => {
@@ -326,28 +400,28 @@ async function restoreBackup(db, filename, path = null) {
         db.prepare('DELETE FROM categories').run();
 
         const insertCategory = db.prepare('INSERT INTO categories (id, name, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)');
-        for (const cat of data.categories) {
-            insertCategory.run(cat.id, cat.name, cat.icon || '', cat.color || '#ff9a56', cat.sort_order || 0);
+        for (const cat of validatedData.categories) {
+            insertCategory.run(cat.id, cat.data.name, cat.data.icon, cat.data.color, cat.sortOrder);
         }
 
         const insertSite = db.prepare('INSERT INTO sites (id, name, url, description, logo, category_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)');
-        for (const site of data.sites) {
-            insertSite.run(site.id, site.name, site.url, site.description || '', site.logo || '', site.category_id, site.sort_order || 0);
+        for (const site of validatedData.sites) {
+            insertSite.run(site.id, site.data.name, site.data.url, site.data.description, site.data.logo || '', site.categoryId, site.sortOrder);
         }
 
         const insertTag = db.prepare('INSERT INTO tags (id, name, color) VALUES (?, ?, ?)');
-        for (const tag of tags) {
-            insertTag.run(tag.id, tag.name, tag.color || '#6366f1');
+        for (const tag of validatedData.tags) {
+            insertTag.run(tag.id, tag.data.name, tag.data.color);
         }
 
         const insertSiteTag = db.prepare('INSERT OR IGNORE INTO site_tags (site_id, tag_id) VALUES (?, ?)');
-        for (const row of siteTags) {
-            insertSiteTag.run(row.site_id, row.tag_id);
+        for (const row of validatedData.siteTags) {
+            insertSiteTag.run(parsePositiveInteger(row.site_id), parsePositiveInteger(row.tag_id));
         }
 
         db.prepare("DELETE FROM settings WHERE key NOT IN ('admin_password', 'webdav_password')").run();
         const insertSetting = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-        for (const entry of settings) {
+        for (const entry of validatedData.settings) {
             if (!entry.key || SENSITIVE_SETTING_KEYS.has(entry.key)) {
                 continue;
             }
@@ -360,10 +434,10 @@ async function restoreBackup(db, filename, path = null) {
     console.log(`恢复成功: ${filename}`);
     return {
         success: true,
-        categories: data.categories.length,
-        sites: data.sites.length,
-        tags: tags.length,
-        site_tags: siteTags.length
+        categories: validatedData.categories.length,
+        sites: validatedData.sites.length,
+        tags: validatedData.tags.length,
+        site_tags: validatedData.siteTags.length
     };
 }
 
@@ -406,6 +480,21 @@ function setupScheduledBackup(db) {
     console.log(`定时备份已设置: ${frequency} (${cronExpression})`);
 }
 
+function stopScheduledBackup() {
+    if (cronJob) {
+        cronJob.stop();
+        cronJob = null;
+    }
+}
+
+function setWebDAVClientFactoryForTest(factory) {
+    const previous = createClientFn;
+    createClientFn = factory;
+    return () => {
+        createClientFn = previous;
+    };
+}
+
 // 测试 WebDAV 连接
 async function testConnection(url, username, password) {
     try {
@@ -441,5 +530,7 @@ module.exports = {
     listBackups,
     restoreBackup,
     setupScheduledBackup,
+    stopScheduledBackup,
+    setWebDAVClientFactoryForTest,
     testConnection
 };

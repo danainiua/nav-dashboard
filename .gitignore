@@ -33,6 +33,7 @@ Thumbs.db
 *.bak
 *.tmp
 *.log
+tmpclaude-*
 .git/
 
 # Docker data and uploads

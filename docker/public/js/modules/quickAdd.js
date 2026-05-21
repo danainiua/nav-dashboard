@@ -269,8 +269,18 @@ export function initQuickAdd() {
         try {
             const data = await fetchCategories();
             if (data.success && data.data) {
-                quickAddCategory.innerHTML = '<option value="">选择分类...</option>' +
-                    data.data.map(cat => `<option value="${cat.id}">${cat.icon || ''} ${cat.name}</option>`).join('');
+                quickAddCategory.innerHTML = '';
+                const defaultOption = document.createElement('option');
+                defaultOption.value = '';
+                defaultOption.textContent = '选择分类...';
+                quickAddCategory.appendChild(defaultOption);
+
+                for (const cat of data.data) {
+                    const option = document.createElement('option');
+                    option.value = Number.isInteger(Number(cat.id)) && Number(cat.id) > 0 ? String(cat.id) : '';
+                    option.textContent = `${cat.icon || ''} ${cat.name || ''}`;
+                    quickAddCategory.appendChild(option);
+                }
 
                 // 动态获取当前分类
                 import('./ui.js').then(ui => {
@@ -338,11 +348,30 @@ export function initQuickAdd() {
         updateQuickAddPreview(e.target.value);
     });
 
+    function safePreviewImageSrc(value) {
+        const src = String(value || '').trim();
+        if (src === DEFAULT_ICON || src.startsWith('/api/images/')) {
+            return src;
+        }
+        try {
+            const url = new URL(src, window.location.origin);
+            return ['http:', 'https:'].includes(url.protocol) ? url.toString() : '';
+        } catch {
+            return '';
+        }
+    }
+
     function updateQuickAddPreview(url) {
-        if (url && url.trim()) {
-            quickAddLogoPreview.innerHTML = `<img src="${url}" alt="Logo" onerror="this.style.display='none'">`;
-        } else {
-            quickAddLogoPreview.innerHTML = '';
+        quickAddLogoPreview.innerHTML = '';
+        const src = safePreviewImageSrc(url);
+        if (src) {
+            const img = document.createElement('img');
+            img.src = src;
+            img.alt = 'Logo';
+            img.onerror = () => {
+                img.style.display = 'none';
+            };
+            quickAddLogoPreview.appendChild(img);
         }
     }
 

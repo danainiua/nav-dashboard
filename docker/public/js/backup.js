@@ -5,6 +5,21 @@
 
 const API_BASE_BACKUP = '';
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text ?? '';
+    return div.innerHTML;
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+function safeBackupFilename(filename) {
+    const value = String(filename || '');
+    return /^nav-dashboard-backup-\d{8}\.json$/.test(value) ? value : '';
+}
+
 // 初始化备份面板
 function initBackupPanel() {
     loadBackupConfig();
@@ -33,8 +48,8 @@ async function loadBackupConfig() {
             const statusEl = document.getElementById('lastBackupStatus');
             if (statusEl && config.last_backup_time) {
                 statusEl.innerHTML = `
-                    <strong>上次备份:</strong> ${new Date(config.last_backup_time).toLocaleString()}<br>
-                    <strong>状态:</strong> ${config.last_backup_status || '未知'}
+                    <strong>上次备份:</strong> ${escapeHtml(new Date(config.last_backup_time).toLocaleString())}<br>
+                    <strong>状态:</strong> ${escapeHtml(config.last_backup_status || '未知')}
                 `;
             }
         }
@@ -158,28 +173,40 @@ async function loadBackupList() {
         const data = await response.json();
 
         if (data.success && data.data.length > 0) {
-            listEl.innerHTML = data.data.map(backup => `
+            listEl.innerHTML = data.data.map((backup) => {
+                const filename = safeBackupFilename(backup.filename);
+                if (!filename) return '';
+                return `
                 <div style="display:flex; justify-content:space-between; align-items:center; padding:0.75rem; background:rgba(255,255,255,0.1); border-radius:8px; margin-bottom:0.5rem;">
                     <div>
-                        <strong>${backup.filename}</strong><br>
-                        <small style="opacity:0.7;">${new Date(backup.lastModified).toLocaleString()}</small>
+                        <strong>${escapeHtml(filename)}</strong><br>
+                        <small style="opacity:0.7;">${escapeHtml(new Date(backup.lastModified).toLocaleString())}</small>
                     </div>
-                    <button class="btn-secondary" onclick="restoreBackup('${backup.filename}')" style="padding:0.4rem 0.8rem;">📥 恢复</button>
+                    <button class="btn-secondary" data-backup-filename="${escapeAttr(filename)}" style="padding:0.4rem 0.8rem;">📥 恢复</button>
                 </div>
-            `).join('');
+            `;
+            }).join('');
+            listEl.querySelectorAll('[data-backup-filename]').forEach((button) => {
+                button.addEventListener('click', () => restoreBackup(button.dataset.backupFilename));
+            });
         } else if (data.success) {
             listEl.innerHTML = '<div style="text-align:center; padding:1rem; opacity:0.7;">暂无备份文件</div>';
         } else {
-            listEl.innerHTML = `<div style="text-align:center; padding:1rem; color:#ff6b6b;">加载失败: ${data.message}</div>`;
+            listEl.innerHTML = `<div style="text-align:center; padding:1rem; color:#ff6b6b;">加载失败: ${escapeHtml(data.message)}</div>`;
         }
     } catch (error) {
-        listEl.innerHTML = `<div style="text-align:center; padding:1rem; color:#ff6b6b;">请求失败: ${error.message}</div>`;
+        listEl.innerHTML = `<div style="text-align:center; padding:1rem; color:#ff6b6b;">请求失败: ${escapeHtml(error.message)}</div>`;
     }
 }
 
 // 恢复备份
 async function restoreBackup(filename) {
-    if (!confirm(`确定要从 "${filename}" 恢复数据吗？\n\n警告：这将覆盖当前的分类和站点数据！`)) {
+    const safeFilename = safeBackupFilename(filename);
+    if (!safeFilename) {
+        showBackupMsg('✗ 备份文件名无效', 'error');
+        return;
+    }
+    if (!confirm(`确定要从 "${safeFilename}" 恢复数据吗？\n\n警告：这将覆盖当前的分类和站点数据！`)) {
         return;
     }
 
@@ -187,7 +214,7 @@ async function restoreBackup(filename) {
         const response = await fetch(`${API_BASE_BACKUP}/api/backup/restore`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ filename })
+            body: JSON.stringify({ filename: safeFilename })
         });
         const data = await response.json();
 

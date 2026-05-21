@@ -5,7 +5,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { hashPassword, verifyPassword, sha256Hash } = require('../utils/hash');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, clearAllTokens } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 
 // ==================== 背景图设置 ====================
@@ -234,6 +234,7 @@ router.put('/password', requireAuth, asyncHandler(async (req, res) => {
 
     const newHash = await hashPassword(new_password);
     db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run('admin_password', newHash);
+    clearAllTokens();
     res.json({ message: '密码修改成功' });
 }));
 

@@ -17,6 +17,42 @@ export let allTags = [];  // 所有标签缓存
 // 默认图标路径
 export const DEFAULT_ICON = '/default-icon.png';
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text ?? '';
+    return div.innerHTML;
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+function safeCssColor(value, fallback = '#6366f1') {
+    return /^#[0-9A-Fa-f]{6}$/.test(String(value || '')) ? value : fallback;
+}
+
+function safeHttpUrl(value, fallback = '#') {
+    try {
+        const url = new URL(String(value || ''), window.location.origin);
+        return ['http:', 'https:'].includes(url.protocol) ? url.toString() : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function safeImageSrc(value, fallback = DEFAULT_ICON) {
+    const src = String(value || '').trim();
+    if (src === DEFAULT_ICON || src.startsWith('/api/images/')) {
+        return src;
+    }
+    return safeHttpUrl(src, fallback);
+}
+
+function safePositiveInteger(value, fallback = 0) {
+    const number = Number(value);
+    return Number.isInteger(number) && number > 0 ? number : fallback;
+}
+
 /**
  * 更新分页状态
  */
@@ -80,13 +116,14 @@ export function hideSkeletons() {
  * 创建站点卡片
  */
 export function createSiteCard(site) {
-    const logo = site.logo || DEFAULT_ICON;
+    const logo = safeImageSrc(site.logo || DEFAULT_ICON);
+    const siteUrl = safeHttpUrl(site.url);
 
     const card = document.createElement('div');
     card.className = 'site-card glass-effect';
-    card.dataset.siteId = site.id;
-    card.dataset.tooltip = site.name;
-    card.dataset.url = site.url;
+    card.dataset.siteId = safePositiveInteger(site.id);
+    card.dataset.tooltip = String(site.name || '');
+    card.dataset.url = siteUrl;
 
     // 生成标签徽章 HTML
     let tagsHtml = '';
@@ -95,8 +132,8 @@ export function createSiteCard(site) {
         tagsHtml = `
             <div class="site-card-tags">
                 ${displayTags.map(tag => `
-                    <span class="site-tag-badge" style="background-color: ${tag.color}" title="${tag.name}">
-                        ${tag.name}
+                    <span class="site-tag-badge" style="background-color: ${safeCssColor(tag.color)}" title="${escapeAttr(tag.name)}">
+                        ${escapeHtml(tag.name)}
                     </span>
                 `).join('')}
             </div>
@@ -107,16 +144,16 @@ export function createSiteCard(site) {
         <div class="logo-wrapper">
             <div class="logo-placeholder"></div>
             <img class="site-logo lazy"
-                 data-src="${logo}"
-                 alt="${site.name}">
+                 data-src="${escapeAttr(logo)}"
+                 alt="${escapeAttr(site.name)}">
         </div>
-        <span class="site-name">${site.name}</span>
+        <span class="site-name">${escapeHtml(site.name)}</span>
         ${tagsHtml}
     `;
 
     // 点击跳转
     card.addEventListener('click', () => {
-        window.open(site.url, '_blank');
+        window.open(siteUrl, '_blank', 'noopener,noreferrer');
     });
 
     return card;
@@ -170,10 +207,10 @@ export function createCategoryTab(id, name, color, active = false, icon = '') {
     const tab = document.createElement('button');
     tab.className = 'category-tab' + (active ? ' active' : '');
     tab.dataset.category = id;
-    tab.style.setProperty('--category-color', color);
+    tab.style.setProperty('--category-color', safeCssColor(color, '#a78bfa'));
 
     if (icon) {
-        tab.innerHTML = `<span class="category-icon">${icon}</span>${name}`;
+        tab.innerHTML = `<span class="category-icon">${escapeHtml(icon)}</span>${escapeHtml(name)}`;
     } else {
         tab.textContent = name;
     }
@@ -275,13 +312,16 @@ export function renderTagsFilter() {
     }
 
     // 渲染标签列表
-    tagFilterList.innerHTML = allTags.map(tag => `
-        <label class="tag-filter-item${currentTagFilter.includes(tag.id) ? ' active' : ''}">
-            <input type="checkbox" data-tag-id="${tag.id}" ${currentTagFilter.includes(tag.id) ? 'checked' : ''}>
-            <span class="tag-filter-color" style="background-color: ${tag.color}"></span>
+    tagFilterList.innerHTML = allTags.map(tag => {
+        const id = safePositiveInteger(tag.id);
+        return `
+        <label class="tag-filter-item${currentTagFilter.includes(id) ? ' active' : ''}">
+            <input type="checkbox" data-tag-id="${id}" ${currentTagFilter.includes(id) ? 'checked' : ''}>
+            <span class="tag-filter-color" style="background-color: ${safeCssColor(tag.color)}"></span>
             <span class="tag-filter-name">${escapeHtml(tag.name)}</span>
         </label>
-    `).join('');
+    `;
+    }).join('');
 
     // 绑定复选框事件
     tagFilterList.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
@@ -393,15 +433,6 @@ export async function loadSitesByTagFilter() {
         console.error('按标签加载站点失败:', error);
         document.getElementById('sitesGrid').innerHTML = '<div class="no-results">加载失败，请刷新重试</div>';
     }
-}
-
-/**
- * HTML 转义
- */
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
 }
 
 /**

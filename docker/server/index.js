@@ -27,8 +27,32 @@ const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const VERSION = '1.3.0';
+function createCorsOptions() {
+    const allowedOrigins = (process.env.CORS_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+
+    return {
+        origin(origin, callback) {
+            if (!origin || allowedOrigins.includes(origin)) {
+                callback(null, true);
+                return;
+            }
+            callback(null, false);
+        },
+        credentials: allowedOrigins.length > 0,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Token']
+    };
+}
+
 function createApp() {
     const app = express();
+
+    if (process.env.TRUST_PROXY === 'true') {
+        app.set('trust proxy', 1);
+    }
 
     // 确保上传目录存在
     const uploadsDir = path.join(__dirname, '..', 'uploads');
@@ -63,7 +87,7 @@ function createApp() {
         next();
     });
 
-    app.use(cors());
+    app.use(cors(createCorsOptions()));
     app.use(express.json({ limit: '10mb' }));
 
     // 安全头

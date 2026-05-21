@@ -7,7 +7,7 @@ const db = require('../db');
 const { hashPassword, verifyPassword, sha256Hash, needsUpgrade } = require('../utils/hash');
 const { getClientIp, checkLoginLimit, recordLoginFailure, resetLoginAttempts } = require('../middleware/rateLimit');
 const { asyncHandler } = require('../middleware/errorHandler');
-const { createToken, extractToken, logout, validateToken } = require('../middleware/auth');
+const { createToken, extractToken, logout, validateToken, buildAuthCookie, buildClearAuthCookie } = require('../middleware/auth');
 
 // 验证密码（登录）
 router.post('/verify', asyncHandler(async (req, res) => {
@@ -65,7 +65,7 @@ router.post('/verify', asyncHandler(async (req, res) => {
         const token = createToken();
 
         // 设置 cookie
-        res.setHeader('Set-Cookie', `nav_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${24 * 60 * 60}`);
+        res.setHeader('Set-Cookie', buildAuthCookie(req, token));
 
         res.json({ success: true, token });
     } else {
@@ -83,7 +83,7 @@ router.post('/logout', (req, res) => {
     logout(token);
 
     // 清除 cookie
-    res.setHeader('Set-Cookie', 'nav_token=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0');
+    res.setHeader('Set-Cookie', buildClearAuthCookie(req));
 
     res.json({ success: true, message: '已登出' });
 });

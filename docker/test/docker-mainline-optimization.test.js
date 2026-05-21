@@ -81,6 +81,7 @@ test('docker mainline wave: password/data/backup config behavior', async (t) => 
     });
 
     t.after(() => {
+        require('../server/backup').stopScheduledBackup();
         server.close(() => {});
         db.close();
         fs.rmSync(tempDir, { recursive: true, force: true });

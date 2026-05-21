@@ -4,6 +4,33 @@
 
 import { API_BASE } from './api.js';
 
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text ?? '';
+    return div.innerHTML;
+}
+
+function escapeAttr(value) {
+    return escapeHtml(value);
+}
+
+function safeHttpUrl(value, fallback = '#') {
+    try {
+        const url = new URL(String(value || ''), window.location.origin);
+        return ['http:', 'https:'].includes(url.protocol) ? url.toString() : fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+function safeImageSrc(value, fallback = '') {
+    const src = String(value || '').trim();
+    if (src.startsWith('/api/images/') || src === '/default-icon.png') {
+        return src;
+    }
+    return safeHttpUrl(src, fallback);
+}
+
 /**
  * 设置搜索功能
  */
@@ -60,10 +87,10 @@ export function setupSearch() {
                     suggestions.innerHTML = `
                         <div class="suggestion-header">📌 站内匹配</div>
                         ${matches.map(site => `
-                            <a href="${site.url}" target="_blank" class="suggestion-item">
-                                <img src="${site.logo || ''}" alt="" onerror="this.style.display='none'">
-                                <span class="suggestion-name">${site.name}</span>
-                                <span class="suggestion-url">${getDomain(site.url)}</span>
+                            <a href="${escapeAttr(safeHttpUrl(site.url))}" target="_blank" rel="noopener noreferrer" class="suggestion-item">
+                                <img src="${escapeAttr(safeImageSrc(site.logo || ''))}" alt="" onerror="this.style.display='none'">
+                                <span class="suggestion-name">${escapeHtml(site.name)}</span>
+                                <span class="suggestion-url">${escapeHtml(getDomain(site.url))}</span>
                             </a>
                         `).join('')}
                     `;

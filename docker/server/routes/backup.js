@@ -6,6 +6,7 @@ const router = express.Router();
 const db = require('../db');
 const backup = require('../backup');
 const { requireAuth } = require('../middleware/auth');
+const { validateBackupFilename } = require('../utils/validator');
 
 const MASKED_PASSWORD_PLACEHOLDER = '******';
 const VALID_BACKUP_FREQUENCIES = new Set(['off', 'daily', 'weekly']);
@@ -90,7 +91,11 @@ router.post('/restore', async (req, res) => {
         if (!filename) {
             return res.status(400).json({ success: false, message: '请指定备份文件' });
         }
-        const result = await backup.restoreBackup(db, filename);
+        const filenameValidation = validateBackupFilename(filename);
+        if (!filenameValidation.valid) {
+            return res.status(400).json({ success: false, message: filenameValidation.error });
+        }
+        const result = await backup.restoreBackup(db, filenameValidation.filename);
         res.json(result);
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

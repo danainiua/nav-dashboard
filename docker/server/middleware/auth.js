@@ -10,6 +10,10 @@ const { verifyPassword, sha256Hash } = require('../utils/hash');
 const tokens = new Map();
 const TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24小时
 
+function hashToken(token) {
+    return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 /**
  * 生成安全的 token
  */
@@ -23,7 +27,7 @@ function generateToken() {
 function createToken() {
     const token = generateToken();
     const expiry = Date.now() + TOKEN_EXPIRY;
-    tokens.set(token, { expiry, createdAt: Date.now() });
+    tokens.set(hashToken(token), { expiry, createdAt: Date.now() });
 
     // 清理过期 token
     cleanExpiredTokens();
@@ -37,11 +41,12 @@ function createToken() {
 function validateToken(token) {
     if (!token) return false;
 
-    const data = tokens.get(token);
+    const tokenHash = hashToken(token);
+    const data = tokens.get(tokenHash);
     if (!data) return false;
 
     if (Date.now() > data.expiry) {
-        tokens.delete(token);
+        tokens.delete(tokenHash);
         return false;
     }
 
@@ -145,8 +150,51 @@ async function login(password) {
  */
 function logout(token) {
     if (token) {
-        tokens.delete(token);
+        tokens.delete(hashToken(token));
     }
+}
+
+function clearAllTokens() {
+    tokens.clear();
+}
+
+function shouldUseSecureCookie(req) {
+    return process.env.COOKIE_SECURE === 'true'
+        || process.env.TRUST_PROXY === 'true'
+        || req.secure
+        || req.headers['x-forwarded-proto'] === 'https';
+}
+
+function buildAuthCookie(req, token) {
+    const attributes = [
+        `nav_token=${token}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict',
+        `Max-Age=${TOKEN_EXPIRY / 1000}`
+    ];
+
+    if (shouldUseSecureCookie(req)) {
+        attributes.push('Secure');
+    }
+
+    return attributes.join('; ');
+}
+
+function buildClearAuthCookie(req) {
+    const attributes = [
+        'nav_token=',
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict',
+        'Max-Age=0'
+    ];
+
+    if (shouldUseSecureCookie(req)) {
+        attributes.push('Secure');
+    }
+
+    return attributes.join('; ');
 }
 
 module.exports = {
@@ -156,5 +204,8 @@ module.exports = {
     validateToken,
     extractToken,
     login,
-    logout
+    logout,
+    clearAllTokens,
+    buildAuthCookie,
+    buildClearAuthCookie
 };

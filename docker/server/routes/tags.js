@@ -5,6 +5,46 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireAuth } = require('../middleware/auth');
+const { validateTagData } = require('../utils/validator');
+
+const MAX_TAG_IDS = 50;
+
+function parsePositiveId(value) {
+    const id = parseInt(value, 10);
+    return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function parseTagIds(input) {
+    if (!Array.isArray(input)) {
+        return null;
+    }
+
+    const ids = [];
+    const seen = new Set();
+    for (const value of input) {
+        const id = parsePositiveId(value);
+        if (!id) {
+            return null;
+        }
+        if (!seen.has(id)) {
+            ids.push(id);
+            seen.add(id);
+        }
+    }
+
+    if (ids.length > MAX_TAG_IDS) {
+        return null;
+    }
+
+    return ids;
+}
+
+function parseTagIdsQuery(value) {
+    if (!value || typeof value !== 'string') {
+        return null;
+    }
+    return parseTagIds(value.split(','));
+}
 
 // 获取所有标签
 router.get('/', (req, res) => {
@@ -19,14 +59,16 @@ router.get('/', (req, res) => {
 
 // 创建标签（需要认证）
 router.post('/', requireAuth, (req, res) => {
-    const { name, color } = req.body;
-    if (!name || !name.trim()) {
-        return res.status(400).json({ success: false, message: '标签名称不能为空' });
+    const validation = validateTagData(req.body);
+    if (!validation.valid) {
+        return res.status(400).json({ success: false, message: validation.error });
     }
+
+    const { name, color } = validation.sanitized;
 
     try {
         const stmt = db.prepare('INSERT INTO tags (name, color) VALUES (?, ?)');
-        const result = stmt.run(name.trim(), color || '#6366f1');
+        const result = stmt.run(name, color);
         res.json({ success: true, message: '标签创建成功', data: { id: result.lastInsertRowid } });
     } catch (error) {
         if (error.message.includes('UNIQUE constraint')) {
@@ -38,19 +80,22 @@ router.post('/', requireAuth, (req, res) => {
 
 // 更新标签（需要认证）
 router.put('/:id', requireAuth, (req, res) => {
-    const { name, color } = req.body;
-    const tagId = parseInt(req.params.id);
+    const tagId = parsePositiveId(req.params.id);
 
-    if (isNaN(tagId)) {
+    if (!tagId) {
         return res.status(400).json({ success: false, message: '无效的标签ID' });
     }
-    if (!name || !name.trim()) {
-        return res.status(400).json({ success: false, message: '标签名称不能为空' });
+
+    const validation = validateTagData(req.body);
+    if (!validation.valid) {
+        return res.status(400).json({ success: false, message: validation.error });
     }
+
+    const { name, color } = validation.sanitized;
 
     try {
         const stmt = db.prepare('UPDATE tags SET name = ?, color = ? WHERE id = ?');
-        const result = stmt.run(name.trim(), color || '#6366f1', tagId);
+        const result = stmt.run(name, color, tagId);
 
         if (result.changes === 0) {
             return res.status(404).json({ success: false, message: '标签不存在' });
@@ -66,9 +111,9 @@ router.put('/:id', requireAuth, (req, res) => {
 
 // 删除标签（需要认证）
 router.delete('/:id', requireAuth, (req, res) => {
-    const tagId = parseInt(req.params.id);
+    const tagId = parsePositiveId(req.params.id);
 
-    if (isNaN(tagId)) {
+    if (!tagId) {
         return res.status(400).json({ success: false, message: '无效的标签ID' });
     }
 
@@ -82,9 +127,9 @@ router.delete('/:id', requireAuth, (req, res) => {
 
 // 获取站点的标签
 router.get('/site/:siteId', (req, res) => {
-    const siteId = parseInt(req.params.siteId);
+    const siteId = parsePositiveId(req.params.siteId);
 
-    if (isNaN(siteId)) {
+    if (!siteId) {
         return res.status(400).json({ success: false, message: '无效的站点ID' });
     }
 
@@ -100,15 +145,15 @@ router.get('/site/:siteId', (req, res) => {
 
 // 设置站点的标签（需要认证）
 router.put('/site/:siteId', requireAuth, (req, res) => {
-    const siteId = parseInt(req.params.siteId);
-    const { tag_ids } = req.body;
+    const siteId = parsePositiveId(req.params.siteId);
+    const tagIds = parseTagIds(req.body?.tag_ids);
 
-    if (isNaN(siteId)) {
+    if (!siteId) {
         return res.status(400).json({ success: false, message: '无效的站点ID' });
     }
 
-    if (!Array.isArray(tag_ids)) {
-        return res.status(400).json({ success: false, message: 'tag_ids 必须是数组' });
+    if (!tagIds) {
+        return res.status(400).json({ success: false, message: 'tag_ids 必须是有效的正整数数组' });
     }
 
     // 检查站点是否存在
@@ -131,7 +176,7 @@ router.put('/site/:siteId', requireAuth, (req, res) => {
         }
     });
 
-    updateTags(siteId, tag_ids);
+    updateTags(siteId, tagIds);
 
     res.json({ success: true, message: '站点标签更新成功' });
 });
@@ -144,9 +189,9 @@ router.get('/filter', (req, res) => {
         return res.status(400).json({ success: false, message: '请指定标签ID' });
     }
 
-    const tagIdArray = tag_ids.split(',').map(id => parseInt(id)).filter(id => !isNaN(id));
+    const tagIdArray = parseTagIdsQuery(tag_ids);
 
-    if (tagIdArray.length === 0) {
+    if (!tagIdArray || tagIdArray.length === 0) {
         return res.status(400).json({ success: false, message: '无效的标签ID' });
     }
 

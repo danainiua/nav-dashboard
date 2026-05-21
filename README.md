@@ -2,6 +2,8 @@
 
 一个基于卡片式布局的现代化导航站点，采用磨砂玻璃（Glassmorphism）设计风格。Docker 是目前主要维护的部署方式，同时保留 Cloudflare 兼容性支持。
 
+> 维护状态：Docker 版是主维护线，后续新功能和安全加固默认只进入 Docker 版；Cloudflare 版仅保留给既有部署兼容使用。
+
 **🔗 在线演示**：https://nav.cscs.qzz.io
 
 ## ✨ 特性

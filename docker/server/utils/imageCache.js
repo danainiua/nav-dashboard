@@ -4,6 +4,7 @@
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const { fetchRemoteImage } = require('./remoteImage');
 
 // 上传目录
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
@@ -37,51 +38,21 @@ async function tryDownloadImage(imageUrl) {
             }
         }
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 8000);
-
-        const response = await fetch(imageUrl, {
-            signal: controller.signal,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'image/*,*/*'
-            },
-            redirect: 'follow'
-        });
-        clearTimeout(timeout);
-
-        if (!response.ok) {
-            console.log(`下载失败 [${imageUrl}]: HTTP ${response.status} ${response.statusText}`);
+        const result = await fetchRemoteImage(imageUrl, { maxBytes: 500 * 1024, timeoutMs: 8000 });
+        if (!result.success) {
+            console.log(`下载失败 [${imageUrl}]: ${result.error}`);
             return null;
         }
 
-        const contentType = response.headers.get('Content-Type') || '';
-        if (!contentType.includes('image') && !contentType.includes('octet-stream')) {
-            console.log(`格式错误 [${imageUrl}]: Content-Type 是 ${contentType}`);
+        if (result.buffer.length < 100) {
+            console.log(`大小不符 [${imageUrl}]: ${result.buffer.length} bytes (限制 100B - 500KB)`);
             return null;
         }
 
-        const buffer = Buffer.from(await response.arrayBuffer());
-
-        if (buffer.length < 100 || buffer.length > 500 * 1024) {
-            console.log(`大小不符 [${imageUrl}]: ${buffer.length} bytes (限制 100B - 500KB)`);
-            return null;
-        }
-
-        const extMap = {
-            'image/jpeg': '.jpg',
-            'image/png': '.png',
-            'image/gif': '.gif',
-            'image/svg+xml': '.svg',
-            'image/webp': '.webp',
-            'image/x-icon': '.ico',
-            'image/vnd.microsoft.icon': '.ico'
-        };
-        const ext = extMap[contentType] || '.ico';
-        const filename = `${urlHash}${ext}`;
+        const filename = `${urlHash}${result.extension}`;
         const filePath = path.join(uploadsDir, filename);
 
-        fs.writeFileSync(filePath, buffer);
+        fs.writeFileSync(filePath, result.buffer);
         console.log(`图片已缓存: ${imageUrl} -> /api/images/${filename}`);
         return `/api/images/${filename}`;
     } catch (error) {
