@@ -590,9 +590,8 @@
                     <label>Logo</label>
                     <div class="logo-input-group">
                         <input type="text" id="siteLogo" class="form-input" placeholder="输入远程URL或点击获取">
-                        <button type="button" class="btn-secondary" onclick="autoFetchLogo()"
-                            style="white-space: nowrap;">🔍 获取</button>
-                        <label class="btn-upload">
+                        <button type="button" class="btn-secondary logo-action-btn" onclick="autoFetchLogo()">🔍 获取</button>
+                        <label class="btn-upload logo-action-btn">
                             <input type="file" id="logoUpload" accept="image/*" style="display: none;"
                                 onchange="handleLogoUpload(event)">
                             <span>📁 上传</span>

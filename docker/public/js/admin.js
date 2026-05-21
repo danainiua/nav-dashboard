@@ -58,8 +58,7 @@ async function init() {
         // 按钮1: Google Favicon
         const fetchBtn1 = document.createElement('button');
         fetchBtn1.type = 'button';
-        fetchBtn1.className = 'btn-secondary';
-        fetchBtn1.style.whiteSpace = 'nowrap';
+        fetchBtn1.className = 'btn-secondary logo-action-btn';
         fetchBtn1.innerHTML = '🔍 获取1';
         fetchBtn1.title = 'Google源';
         fetchBtn1.onclick = autoFetchLogo;
@@ -68,8 +67,7 @@ async function init() {
         // 按钮2: toolb.cn Favicon
         const fetchBtn2 = document.createElement('button');
         fetchBtn2.type = 'button';
-        fetchBtn2.className = 'btn-secondary';
-        fetchBtn2.style.whiteSpace = 'nowrap';
+        fetchBtn2.className = 'btn-secondary logo-action-btn';
         fetchBtn2.innerHTML = '🔍 获取2';
         fetchBtn2.title = 'toolb.cn源';
         fetchBtn2.onclick = autoFetchLogo2;
@@ -77,8 +75,7 @@ async function init() {
 
         const defaultBtn = document.createElement('button');
         defaultBtn.type = 'button';
-        defaultBtn.className = 'btn-secondary';
-        defaultBtn.style.whiteSpace = 'nowrap';
+        defaultBtn.className = 'btn-secondary logo-action-btn';
         defaultBtn.innerHTML = '🌐 默认';
         defaultBtn.title = '使用兜底默认图标';
         defaultBtn.onclick = useDefaultLogo;
