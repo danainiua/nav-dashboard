@@ -238,8 +238,8 @@
         <div class="login-box glass-effect">
             <h2>🔐 管理后台</h2>
             <p id="loginDesc">输入管理密码后继续</p>
-            <form id="adminLoginForm" class="login-form">
-                <input type="password" id="adminLoginPassword" class="login-input" placeholder="管理密码" autocomplete="current-password" required>
+            <form id="adminLoginForm" class="login-form" method="post" action="/api/auth/verify" autocomplete="off">
+                <input type="password" id="editPassword" name="password" class="login-input" placeholder="请输入密码" autocomplete="off" required autofocus>
                 <button type="submit" id="adminLoginBtn" class="btn-primary login-btn">进入后台</button>
                 <div id="adminLoginError" class="login-error" aria-live="polite"></div>
             </form>
@@ -741,8 +741,8 @@
             document.getElementById('loginOverlay').style.display = 'flex';
             document.getElementById('loginDesc').textContent = message || '输入管理密码后继续';
             document.getElementById('adminLoginError').textContent = '';
-            document.getElementById('adminLoginPassword').value = '';
-            setTimeout(() => document.getElementById('adminLoginPassword').focus(), 0);
+            document.getElementById('editPassword').value = '';
+            setTimeout(() => document.getElementById('editPassword').focus(), 0);
         }
 
         function showAdminContent() {
@@ -759,7 +759,7 @@
 
         async function handleAdminLogin(e) {
             e.preventDefault();
-            const passwordInput = document.getElementById('adminLoginPassword');
+            const passwordInput = document.getElementById('editPassword');
             const errorEl = document.getElementById('adminLoginError');
             const loginBtn = document.getElementById('adminLoginBtn');
 
