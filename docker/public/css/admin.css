@@ -326,22 +326,32 @@ textarea.form-input {
 /* Logo输入组 */
 .logo-input-group {
     display: flex;
+    align-items: center;
     gap: var(--spacing-sm);
 }
 
 .logo-input-group .form-input {
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 42px;
+}
+
+.logo-input-group .btn-secondary,
+.logo-input-group .btn-upload {
+    flex: 0 0 auto;
+    height: 42px;
+    padding: 0 var(--spacing-md);
+    white-space: nowrap;
 }
 
 .btn-upload {
-    padding: var(--spacing-sm) var(--spacing-md);
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
     color: var(--text-primary);
     cursor: pointer;
     transition: var(--transition);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: var(--spacing-xs);
 }
@@ -541,5 +551,19 @@ textarea.form-input {
     .btn-secondary {
         padding: 0.6rem 1rem;
         font-size: 0.85rem;
+    }
+
+    .logo-input-group {
+        flex-wrap: wrap;
+    }
+
+    .logo-input-group .form-input {
+        flex-basis: 100%;
+    }
+
+    .logo-input-group .btn-secondary,
+    .logo-input-group .btn-upload {
+        height: 38px;
+        padding: 0 0.75rem;
     }
 }
