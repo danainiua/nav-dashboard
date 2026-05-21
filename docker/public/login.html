@@ -143,6 +143,8 @@
                 const response = await fetch('/api/auth/status', { credentials: 'same-origin' });
                 const data = await response.json();
                 if (response.ok && data.success && data.authenticated) {
+                    sessionStorage.setItem('adminLoggedIn', 'true');
+                    sessionStorage.setItem('adminLoginTime', Date.now().toString());
                     window.location.href = getNextUrl();
                 }
             } catch (error) {
