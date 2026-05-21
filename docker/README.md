@@ -78,6 +78,101 @@ volumes:
   - ./uploads:/app/uploads # 上传的图片
 ```
 
+这两个目录是最重要的运行数据，升级、迁移和回滚前都应先备份。
+
+## 🧭 维护流程
+
+### 升级前备份
+
+在 `docker/` 目录执行：
+
+```bash
+npm run backup:upgrade
+```
+
+脚本会把 `./data` 和 `./uploads` 复制到 `./upgrade-backups/backup-时间戳/`。如果你的持久化目录不在默认位置，可以指定路径：
+
+```bash
+NAV_DATA_DIR=/path/to/data NAV_UPLOADS_DIR=/path/to/uploads NAV_BACKUP_DIR=/path/to/backups npm run backup:upgrade
+```
+
+Windows PowerShell 示例：
+
+```powershell
+$env:NAV_DATA_DIR="D:\\nav-dashboard\\data"; $env:NAV_UPLOADS_DIR="D:\\nav-dashboard\\uploads"; npm run backup:upgrade
+```
+
+### Docker Compose 升级
+
+```bash
+# 1) 先备份
+npm run backup:upgrade
+
+# 2) 拉取新镜像
+docker-compose pull
+
+# 3) 重新创建容器
+docker-compose up -d
+
+# 4) 查看日志和健康状态
+docker-compose logs -f --tail=100
+docker-compose ps
+```
+
+如果你使用的是固定版本镜像，先修改 `docker-compose.yml` 中的 `image` 标签，再执行上述命令。
+
+### 健康检查
+
+容器内置健康检查会请求：
+
+```text
+/health/ready
+```
+
+也可以手动验证：
+
+```bash
+curl -fsS http://localhost:3000/health/ready
+```
+
+### 回滚
+
+如果升级后发现问题：
+
+```bash
+# 1) 停止服务
+docker-compose down
+
+# 2) 恢复升级前备份
+rm -rf ./data ./uploads
+cp -a ./upgrade-backups/backup-时间戳/data ./data
+cp -a ./upgrade-backups/backup-时间戳/uploads ./uploads
+
+# 3) 把 docker-compose.yml 的 image 改回旧版本，然后启动
+docker-compose up -d
+```
+
+Windows PowerShell 示例：
+
+```powershell
+docker-compose down
+Remove-Item -Recurse -Force .\\data, .\\uploads
+Copy-Item -Recurse .\\upgrade-backups\\backup-时间戳\\data .\\data
+Copy-Item -Recurse .\\upgrade-backups\\backup-时间戳\\uploads .\\uploads
+docker-compose up -d
+```
+
+### 管理后台备份恢复
+
+管理后台内置备份/恢复适合日常导出和 WebDAV 同步；升级前仍建议使用本地目录备份，因为它同时覆盖 SQLite 数据库和上传图片。
+
+恢复备份时建议：
+
+1. 先执行 `npm run backup:upgrade` 保留当前状态。
+2. 在管理后台执行恢复。
+3. 刷新首页和后台，确认站点、分类、标签、图标都正常。
+4. 如恢复失败，停止服务并用本地目录备份回滚。
+
 ## 📂 目录结构
 
 ```
