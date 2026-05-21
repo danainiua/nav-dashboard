@@ -59,7 +59,10 @@ function faviconFromSiteUrl(siteUrl) {
 
 function displayLogoForSite(site) {
     const logo = String(site.logo || '').trim();
-    return safeImageSrc(!logo || logo === DEFAULT_ICON ? faviconFromSiteUrl(site.url) : logo);
+    if (logo === DEFAULT_ICON) {
+        return DEFAULT_ICON;
+    }
+    return safeImageSrc(logo || faviconFromSiteUrl(site.url));
 }
 
 function safePositiveInteger(value, fallback = 0) {

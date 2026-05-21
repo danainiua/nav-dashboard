@@ -28,6 +28,7 @@ test('homepage rendering escapes site, tag and search suggestion data', () => {
 
     assert.match(uiJs, /function safeImageSrc/);
     assert.match(uiJs, /function displayLogoForSite/);
+    assert.match(uiJs, /if \(logo === DEFAULT_ICON\)/);
     assert.match(uiJs, /faviconFromSiteUrl\(site\.url\)/);
     assert.match(uiJs, /\$\{escapeHtml\(site\.name\)\}/);
     assert.match(uiJs, /\$\{escapeHtml\(tag\.name\)\}/);
@@ -35,6 +36,7 @@ test('homepage rendering escapes site, tag and search suggestion data', () => {
     assert.match(searchJs, /\$\{escapeAttr\(safeHttpUrl\(site\.url\)\)\}/);
     assert.match(searchJs, /const DEFAULT_ICON = '\/default-icon\.png'/);
     assert.match(searchJs, /function displayLogoForSite/);
+    assert.match(searchJs, /if \(logo === DEFAULT_ICON\)/);
     assert.match(searchJs, /faviconFromSiteUrl\(site\.url\)/);
     assert.match(searchJs, /this\.src='\$\{DEFAULT_ICON\}'/);
     assert.doesNotMatch(searchJs, /href="\$\{site\.url\}"/);
