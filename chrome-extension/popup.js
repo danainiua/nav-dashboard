@@ -20,26 +20,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     const DEFAULT_ICON = '/default-icon.png';
 
     // 加载配置
-    const config = await chrome.storage.sync.get(['apiUrl', 'password']);
+    const config = await chrome.storage.sync.get(['apiUrl', 'password', 'preferredLogoMode']);
     apiUrl = config.apiUrl || '';
     password = config.password || '';
+    if (['browser', 'auto', 'default'].includes(config.preferredLogoMode)) {
+        logoModeSelect.value = config.preferredLogoMode;
+    }
 
     if (!apiUrl) {
         notConfigured.style.display = 'block';
         submitBtn.disabled = true;
     }
 
+    function cleanTitle(title, pageUrl = '') {
+        let cleaned = String(title || '').trim();
+        const domain = getDomain(pageUrl).replace(/^www\./, '');
+
+        cleaned = cleaned
+            .replace(/\s+/g, ' ')
+            .replace(/\s+[-|—–·•]\s+(Google Chrome|Microsoft Edge|Mozilla Firefox)$/i, '')
+            .replace(/\s+[-|—–·•]\s+(官网|官方网站|首页|Home)$/i, '')
+            .trim();
+
+        if (domain) {
+            const escapedDomain = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            cleaned = cleaned
+                .replace(new RegExp(`\\s+[-|—–·•]\\s+${escapedDomain}$`, 'i'), '')
+                .replace(new RegExp(`^${escapedDomain}\\s+[-|—–·•]\\s+`, 'i'), '')
+                .trim();
+        }
+
+        return cleaned || domain || title || '';
+    }
+
+    function applySiteData(site) {
+        const url = site?.url || '';
+        nameInput.value = cleanTitle(site?.title, url);
+        urlInput.value = url;
+        setLogo(site?.favIconUrl, url);
+    }
+
     // 判断是从右键菜单打开还是直接点击图标
     const urlParams = new URLSearchParams(window.location.search);
     const isContextMenu = urlParams.get('mode') === 'contextMenu';
+    if (urlParams.get('logoMode') === 'default') {
+        logoModeSelect.value = 'default';
+    }
 
     if (isContextMenu) {
         // 从右键菜单打开，读取存储的数据
         const data = await chrome.storage.local.get('pendingSite');
         if (data.pendingSite) {
-            nameInput.value = data.pendingSite.title || '';
-            urlInput.value = data.pendingSite.url || '';
-            setLogo(data.pendingSite.favIconUrl, data.pendingSite.url);
+            applySiteData(data.pendingSite);
             // 清除临时数据
             chrome.storage.local.remove('pendingSite');
         }
@@ -47,9 +79,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // 直接点击图标，获取当前标签页
         chrome.runtime.sendMessage({ action: 'getCurrentTab' }, (response) => {
             if (response) {
-                nameInput.value = response.title || '';
-                urlInput.value = response.url || '';
-                setLogo(response.favIconUrl, response.url);
+                applySiteData(response);
             }
         });
     }
@@ -241,7 +271,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.runtime.openOptionsPage();
     });
 
-    logoModeSelect.addEventListener('change', updateLogoByMode);
+    logoModeSelect.addEventListener('change', async () => {
+        await chrome.storage.sync.set({ preferredLogoMode: logoModeSelect.value });
+        updateLogoByMode();
+    });
 
     // URL变化时更新Logo
     urlInput.addEventListener('blur', () => {
